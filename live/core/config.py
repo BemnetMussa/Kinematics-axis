@@ -12,6 +12,8 @@ ACT_WIN  = int(ACT_SEC * FS)
 LONG_WIN = int(WIN_SEC * FS)
 PRINT_EVERY = 1.0               # seconds between readings (live)
 CALIB_SEC   = 5.0               # stationary baseline collected at startup
+GET_READY_SEC = 5.0             # PROVISIONAL: live-only grace period to get into the standing/pocket
+                                # position before the calibration capture window (postural 'up' reference)
 WEB_PORT    = 8090              # human-facing web view (terminal dashboard is unchanged)
 
 # ---- activity_state (FROZEN; magnitude features in g; derived on MotionSense) ----

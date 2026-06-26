@@ -6,7 +6,7 @@ only the axis calls now go through the per-axis classify() functions (same logic
 import time
 import numpy as np
 
-from core.config import G, SENSORS, ACT_SEC, WIN_SEC, CALIB_SEC
+from core.config import G, SENSORS, ACT_SEC, WIN_SEC, CALIB_SEC, GET_READY_SEC
 from core.features import magnetic_features
 from interface.sources import get_sensor_window, PhyphoxSource
 from interface.web import _publish
@@ -19,18 +19,35 @@ from axes.overall_state import classify as classify_overall
 
 
 def calibrate(source):
-    print(f"\nCalibration: hold the phone still and stand upright for ~{CALIB_SEC:.0f}s ...")
-    # warm up the buffer, then read one stationary window
+    # The postural 'up' reference MUST be the gravity direction while the user is actually STANDING
+    # with the phone in its deployment position (pocket) -- not whatever orientation it happens to be
+    # in at startup. Otherwise a phone left flat reads tilt~0 from a flat reference and looks "standing".
+    live = isinstance(source, PhyphoxSource)
+    print("\nCalibration -- capturing your STANDING posture reference.")
+    if live:
+        print("  Put the phone in its deployment position (e.g. front trouser pocket),")
+        print("  then STAND UP straight and hold still.")
+    # Give the user time to get into position (live only), then capture the most recent CALIB_SEC.
+    # Synthetic: ready = 0, so the capture window is unchanged from before.
+    ready = GET_READY_SEC if live else 0.0
     t0 = source.now()
-    while source.now() - t0 < CALIB_SEC:
+    announced = set()
+    while source.now() - t0 < ready + CALIB_SEC:
         source.update()
-        if isinstance(source, PhyphoxSource):
+        if live:
+            left = ready + CALIB_SEC - (source.now() - t0)
+            if left > CALIB_SEC:                          # still in the get-into-position phase
+                sec = int(np.ceil(left - CALIB_SEC))
+                if sec not in announced:
+                    print(f"  stand with phone in pocket... capturing in {sec}s")
+                    announced.add(sec)
             time.sleep(0.1)
-    w = source.get_window(CALIB_SEC)
+    w = source.get_window(CALIB_SEC)                      # the most recent CALIB_SEC = the standing window
     calib = {"up": None, "base_mag": None, "base_inc": None}
     if w.get("accel") is not None:
-        calib["up"] = w["accel"].mean(axis=0)             # gravity direction while standing
-        print(f"  postural 'up' reference set: {np.round(calib['up'] / G, 2)} g")
+        calib["up"] = w["accel"].mean(axis=0)             # gravity direction while standing (the reference)
+        up_g = calib["up"] / G
+        print(f"  standing 'up' reference: {np.round(up_g, 2)} g  (|.|={np.linalg.norm(up_g):.2f} g)")
     else:
         print("  [skip] no raw accel -> postural cannot calibrate 'up'")
     if w.get("mag") is not None and w.get("accel") is not None:
