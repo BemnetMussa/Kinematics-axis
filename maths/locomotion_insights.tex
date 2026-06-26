@@ -1,0 +1,130 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath, amssymb}
+\usepackage[margin=1in]{geometry}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+\title{Note on \texttt{locomotion\_classifier}\\[2pt]
+\large approach + cell map (Synheart Kinematics)}
+\date{}
+
+\begin{document}
+\maketitle
+
+A quick map of the notebook so I can find things fast, then jump into the cells and
+explore. Cell numbers count every cell from the top (markdown included), as they
+appear in VS Code. Plain description only --- my own findings go at the end.
+
+\section{The approach in one paragraph}
+It detects \emph{how} a person is moving --- \textsc{stationary},
+\textsc{on foot}, or \textsc{in vehicle} --- by the kinematic source of the motion
+(body, vehicle, or neither). It takes a $5$-second window of phone IMU
+(accel, gyro, linear accel, magnetometer) resampled to $100$ points at $20$~Hz,
+turns it into $216$ hand-crafted time- and frequency-domain features, feeds those to
+an XGBoost classifier, then runs the output through three add-on layers --- GPS
+speed fusion, probability smoothing, and a confidence gate --- before printing a
+label. The full flow is drawn as an ASCII diagram in the title cell
+(\textbf{cell~1}); constants \texttt{FS=20} and \texttt{WINDOW\_SIZE=100} are set in
+\textbf{cell~3}.
+
+\section{Cell map}
+\begin{description}[leftmargin=0pt, style=nextline]
+  \item[\textbf{Cells 1--3} --- setup] Title + architecture diagram (1), pip install
+        of \texttt{xgboost}/\texttt{lightgbm} etc.\ (2), imports, plot style, and the
+        constants \texttt{FS}, \texttt{WINDOW\_SIZE}, class names/colours (3).
+
+  \item[\textbf{Cells 4--6} --- ``what each class looks like'' (\S1)] \textbf{Cell 5}
+        defines \texttt{make\_window}, which \emph{generates} each class from a
+        seeded RNG: stationary $=$ near-zero $+$ gravity $\approx 9.8$ on $Z$;
+        on-foot $=$ a $1.7$~Hz step bounce $+$ rhythmic gyro; in-vehicle $=$ a
+        $12$~Hz aperiodic vibration with a quiet gyro. \textbf{Cell 6} plots accel-$X$,
+        accel-$Z$, gyro-$X$ for the three.
+
+  \item[\textbf{Cells 7--8} --- frequency view (\S2)] \textbf{Cell 8} plots the power
+        spectrum of accel-$Z$ per class, marks the dominant frequency, and shades the
+        four bands $0.5$--$2$, $2$--$4$, $4$--$8$, $8$--$10$~Hz. The stated argument:
+        the classes separate most clearly in the spectrum.
+
+  \item[\textbf{Cells 9--11} --- the $216$ features (\S3)] \textbf{Cell 10} defines
+        \texttt{time\_features} ($11$: mean, std, min, max, range, rms, energy,
+        kurtosis, skewness, zero-crossing rate, IQR) and \texttt{freq\_features}
+        ($7$: dominant freq, spectral entropy, spectral centroid, $4$ band energies);
+        \texttt{extract\_window} runs both over $12$ channels --- the $9$ per-axis
+        signals plus $3$ magnitudes (\texttt{np.linalg.norm} of each $xyz$ group) ---
+        giving $12\times 18 = 216$. \textbf{Cell 11} plots distributions of $8$ chosen
+        features over $N=200$ generated windows per class.
+
+  \item[\textbf{Cells 12--13} --- LOSO (\S4)] \textbf{Cell 13} holds the per-user F1
+        dictionary \texttt{loso\_results} ($8$ users scored, $7$ skipped for missing
+        classes) and a model-comparison bar (XGBoost $0.818$, RF $0.804$, LightGBM
+        $0.799$, ExtraTrees $0.785$, CNN $0.725$, MLP $0.692$, SVM $0.678$). These are
+        fixed numbers typed into the cell, commented ``actual results from our
+        training run.''
+
+  \item[\textbf{Cells 14--15} --- confusion matrix (\S5)] \textbf{Cell 15} hardcodes a
+        $3\times 3$ matrix (comment: ``approximate''). The largest off-diagonal is
+        stationary $\leftrightarrow$ in-vehicle (a still phone reads like a smooth
+        ride).
+
+  \item[\textbf{Cells 16--17} --- GPS fusion (\S6)] \textbf{Cell 17} defines a
+        speed$\to$weight table (\texttt{GPS\_SPEEDS}, \texttt{GPS\_W\_STAT/FOOT/VEH}),
+        interpolates it, multiplies the class probabilities by the weights and
+        renormalises; includes a worked example at $0.3$~m/s.
+
+  \item[\textbf{Cells 18--19} --- inference pipeline (\S7)] Four layers: XGBoost
+        $\to$ GPS fusion $\to$ averaging the last $5$ probability vectors $\to$ a
+        confidence gate (hold previous state if top prob $<0.45$). \textbf{Cell 19}
+        runs a generated sequence (10 stationary $\to$ 15 on-foot $\to$ 10 vehicle)
+        through it and plots raw vs fused vs final.
+
+  \item[\textbf{Cells 20--22} --- live / leftovers] \textbf{Cell 20} is a stray
+        \texttt{\# ive\_classify.py}; \textbf{cell 21} is the Phyphox + iPhone
+        run-instructions markdown (refers to \texttt{src/live\_classify.py}, which is
+        not in the notebook) plus a next-steps list; \textbf{cell 22} is empty.
+\end{description}
+
+\section{Facts to keep in mind}
+\begin{itemize}[noitemsep]
+  \item \textbf{The data is synthetic.} Every signal, spectrum, and feature
+        distribution comes from \texttt{make\_window} (cell 5); no recordings are
+        loaded.
+  \item \textbf{The results are hardcoded.} No dataset, no \texttt{xgboost} import, no
+        \texttt{.fit()} anywhere. The LOSO, model-comparison, and confusion numbers
+        (cells 13, 15) are written by hand.
+  \item \textbf{No orientation test.} $9$ of the $12$ channels are per-axis and the
+        per-axis \texttt{mean} feature is the gravity direction; no rotation/placement
+        check is run.
+  \item \textbf{GPS does the stationary-vs-vehicle split} (cells 15--17): the IMU
+        alone has its biggest confusion there.
+\end{itemize}
+
+\section{Small bugs}
+\begin{itemize}[noitemsep]
+  \item Cell 19: \texttt{prob\_buf\_sim = deque = []} names a plain list
+        \texttt{deque} (\texttt{collections.deque} is never imported) and calls
+        \texttt{.pop(0)} on it.
+  \item Cell 20: stray empty \texttt{\# ive\_classify.py} (typo of
+        \emph{live\_classify}).
+  \item Cell 9 text says ``time-domain ($11$ features)'' but the table lists $9$ ---
+        \texttt{min} and \texttt{max} are in the code (cell 10) but not the doc.
+\end{itemize}
+
+\section{My findings}
+% --- add my own notes here after exploring the cells ---
+\begin{itemize}[noitemsep]
+  \item
+  \item
+  \item
+\end{itemize}
+
+\section{My questions for the meeting}
+% --- things to raise / ask ---
+\begin{itemize}[noitemsep]
+  \item
+  \item
+  \item
+\end{itemize}
+
+\end{document}
