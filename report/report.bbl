@@ -1,0 +1,72 @@
+\begin{thebibliography}{8}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Anguita et~al.(2013)Anguita, Ghio, Oneto, Parra, and
+  Reyes-Ortiz]{anguita2013ucihar}
+Davide Anguita, Alessandro Ghio, Luca Oneto, Xavier Parra, and Jorge~L.
+  Reyes-Ortiz.
+\newblock A public domain dataset for human activity recognition using
+  smartphones.
+\newblock In \emph{Proceedings of the 21st European Symposium on Artificial
+  Neural Networks (ESANN)}, 2013.
+\newblock UCI-HAR dataset.
+
+\bibitem[Gjoreski et~al.(2018)Gjoreski, Ciliberto, Wang,
+  Ord{\'o}{\~n}ez~Morales, Mekki, Valentin, and Roggen]{gjoreski2018shl}
+Hristijan Gjoreski, Mathias Ciliberto, Lin Wang, Francisco~Javier
+  Ord{\'o}{\~n}ez~Morales, Sami Mekki, Stefan Valentin, and Daniel Roggen.
+\newblock The university of sussex-huawei locomotion and transportation dataset
+  for multimodal analytics with mobile devices.
+\newblock \emph{IEEE Access}, 6, 2018.
+\newblock Sussex-Huawei Locomotion (SHL) dataset.
+
+\bibitem[Hemminki et~al.(2013)Hemminki, Nurmi, and
+  Tarkoma]{hemminki2013transportation}
+Samuli Hemminki, Petteri Nurmi, and Sasu Tarkoma.
+\newblock Accelerometer-based transportation mode detection on smartphones.
+\newblock In \emph{Proceedings of the 11th ACM Conference on Embedded Networked
+  Sensor Systems (SenSys)}, 2013.
+
+\bibitem[Malekzadeh et~al.(2019)Malekzadeh, Clegg, Cavallaro, and
+  Haddadi]{malekzadeh2019motionsense}
+Mohammad Malekzadeh, Richard~G. Clegg, Andrea Cavallaro, and Hamed Haddadi.
+\newblock Mobile sensor data anonymization.
+\newblock In \emph{Proceedings of the International Conference on Internet of
+  Things Design and Implementation (IoTDI)}, 2019.
+\newblock MotionSense dataset.
+
+\bibitem[Moe-Nilssen and Helbostad(2004)]{moenilssen2004gait}
+Rolf Moe-Nilssen and Jorunn~L. Helbostad.
+\newblock Estimation of gait cycle characteristics by trunk accelerometry.
+\newblock \emph{Journal of Biomechanics}, 37\penalty0 (1):\penalty0 121--126,
+  2004.
+
+\bibitem[Reiss and Stricker(2012)]{reiss2012pamap2}
+Attila Reiss and Didier Stricker.
+\newblock Introducing a new benchmarked dataset for activity monitoring.
+\newblock In \emph{Proceedings of the 16th International Symposium on Wearable
+  Computers (ISWC)}, 2012.
+\newblock PAMAP2 Physical Activity Monitoring dataset.
+
+\bibitem[Staacks et~al.(2018)Staacks, H{\"u}tz, Heinke, and
+  Stampfer]{staacks2018phyphox}
+Sebastian Staacks, Simon H{\"u}tz, Heidrun Heinke, and Christoph Stampfer.
+\newblock Advanced tools for smartphone-based experiments: phyphox.
+\newblock \emph{Physics Education}, 53\penalty0 (4), 2018.
+
+\bibitem[Stisen et~al.(2015)Stisen, Blunck, Bhattacharya, Prentow,
+  Kj{\ae}rgaard, Dey, Sonne, and Jensen]{stisen2015hhar}
+Allan Stisen, Henrik Blunck, Sourav Bhattacharya, Thor~Siiger Prentow,
+  Mikkel~Baun Kj{\ae}rgaard, Anind Dey, Tobias Sonne, and Mads~M{\o}ller
+  Jensen.
+\newblock Smart devices are different: Assessing and mitigating mobile sensing
+  heterogeneities for activity recognition.
+\newblock In \emph{Proceedings of the 13th ACM Conference on Embedded Networked
+  Sensor Systems (SenSys)}, 2015.
+\newblock Heterogeneity Human Activity Recognition (HHAR) dataset.
+
+\end{thebibliography}
