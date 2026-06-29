@@ -39,4 +39,4 @@ def classify(w, calib):
     else:
         confidence = "high"
         note = f"tilt={tilt:.0f}deg (thigh) move={movement_g:.3f}g"
-    return {"label": label, "tilt": tilt, "confidence": confidence, "note": note}
+    return {"label": label, "tilt": tilt, "move": movement_g, "confidence": confidence, "note": note}

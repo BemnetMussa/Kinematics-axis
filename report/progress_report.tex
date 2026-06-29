@@ -1,0 +1,140 @@
+% Synheart HSI -- Kinematic Axis: Intern Progress Report (<= 3 pages)
+% Compile:  pdflatex progress_report
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\setlist[itemize]{leftmargin=1.4em, itemsep=2pt, topsep=2pt, parsep=0pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.4em}
+\setlength{\emergencystretch}{2.5em}
+\newcommand{\nb}[1]{\texttt{\footnotesize #1}}
+
+% one validation panel: image + a short result line underneath
+\newcommand{\panel}[2]{%
+  \begin{minipage}[t]{0.48\textwidth}\centering
+    \includegraphics[width=\linewidth]{#1}\\[2pt]
+    {\footnotesize #2}
+  \end{minipage}}
+
+\pagestyle{plain}
+
+\begin{document}
+
+\begin{center}
+  {\large\bfseries Synheart HSI --- Kinematic Axis: Intern Progress Report}\\[3pt]
+  % TODO: confirm author name
+  Bemnet Mussa \quad\textbar\quad Synheart AI \quad\textbar\quad \today
+\end{center}
+\vspace{-0.3em}\hrule\vspace{0.6em}
+
+% ----------------------------------------------------------------------------
+\section*{1.\quad Task}
+
+The kinematic axis of Synheart's Human State Interface (HSI): infer a person's physical
+state from a phone's motion and field sensors, under three constraints --- \emph{on-device},
+\emph{deterministic} (rule-based, no machine learning), and \emph{privacy-first} (only
+state readings leave the device, never the raw signal). I was assigned the Activity State
+and Movement Regularity axes, and extended the work to the full set of five deterministic
+states plus a single live system that runs all of them together off one phone stream.
+
+% ----------------------------------------------------------------------------
+\section*{2.\quad The five states and how they validate}
+
+Each state is a deterministic rule over an explicit physical quantity, built and validated
+on public datasets (MotionSense, HHAR, PAMAP2). The panels below show, for each state, the
+plot from its notebook that demonstrates the rule works, with the measured result. Where a
+part is not yet tested, it is called out honestly.
+
+\vspace{0.4em}
+\panel{figs/act_features.png}{\textbf{activity\_state --- 97.1\%} on MotionSense
+(sed/walk/run; macro-F1 0.95, ECE 0.024), \textbf{99.6\%} cross-dataset on HHAR, and
+\textbf{93.7\%} once the cycling branch is added (sed/walk/cycling, HHAR). The magnitude
+thresholds separate the classes orientation-invariantly; cycling is caught by gyroscope
+energy in the low-motion region.}
+\hfill
+\panel{figs/reg_dist.png}{\textbf{movement\_regularity --- separation, not accuracy.} A
+continuous score from the Moe-Nilssen trunk-accelerometry autocorrelation method
+(\emph{J.\ Biomechanics} 2004). No labelled ground truth, so no accuracy by design;
+validated by clean separation (rhythmic gait $\approx$0.9 vs static $\approx$0.1) and
+ROC-AUC 0.95 rhythmic-vs-irregular on PAMAP2.}
+
+\vspace{0.8em}
+\panel{figs/pos_acc.png}{\textbf{postural\_state --- 95\%} (lying / upright / in-motion,
+PAMAP2 chest). The one axis that keeps orientation: posture \emph{is} gravity direction, so it
+measures the tilt between current gravity and a calibrated upright. Accurate because lying
+swings gravity $\sim$85$^\circ$ off upright (a wide, clean gap) and the threshold sits above
+the whole upright spread, so upright is never misread as lying --- $\sim$97\% on the core
+lying-vs-upright question, $\sim$94\% on a leak-proof held-out test. Chest + calibration is an
+upper bound; the pocket deployment splits sitting/standing at the thigh.}
+\hfill
+\panel{figs/loco_pair.png}{\textbf{locomotion\_state --- to be tested.} The live rule reads
+step rhythm for \emph{on foot} and a self-calibrated magnetometer for the hard
+stationary-vs-in-vehicle split --- a steel cabin distorts the geomagnetic field, giving a
+clean field-magnitude / inclination gap (shown, single-car PAMAP2 demo). This is a
+demonstration, not a validation; proper testing needs a transport-mode dataset (SHL).}
+
+\vspace{0.8em}
+\begin{center}
+\panel{figs/overall.png}{\textbf{overall\_state --- the combiner.} A deterministic priority
+cascade turns the four states into a situation + exertion (0--3) + heart-rate note. The
+notebook demonstrates the logic end-to-end on PAMAP2 at \textbf{71\%} (with simplified
+stand-in axes; errors inherit from locomotion). The \emph{live} combiner runs the real four
+axes and adds a cycling situation, so it is not identical to this 71\% demo.}
+\end{center}
+
+\vspace{0.4em}
+Holding it together, beyond the individual states:
+
+\begin{itemize}
+  \item \textbf{Prior-art grounding.} Each state maps to an established measurement method
+        (acceleration energy / ENMO, Moe-Nilssen autocorrelation, tilt / magnetic
+        inclination, magnitude orientation-invariance); the contribution is their
+        deterministic integration, not a new model.
+  \item \textbf{Convergence testing.} Running the five together off one pocket stream
+        surfaced and fixed real bugs --- an $\mathrm{m/s^2}\!\to\! g$ unit mismatch, a
+        thigh-tilt inversion, and magnetometer baselines that had to become self-calibrated
+        at startup.
+  \item \textbf{Live on-device system.} One deterministic $\sim$50~Hz pipeline runs all five
+        states from a single phone stream (Phyphox over WiFi), with a terminal technical
+        view and a human-facing web view, startup calibration (with a PASS/FAIL check), and
+        graceful degradation when a sensor is missing. \emph{It has been run successfully on
+        a real phone.}
+  \item \textbf{Technical report.} A separate report documents the live implementation and
+        the design approach.
+\end{itemize}
+
+% ----------------------------------------------------------------------------
+\section*{3.\quad What is left / next}
+
+\begin{itemize}
+  \item \textbf{Per-scenario testing.} The live system runs on a physical phone; what
+        remains is systematically testing each scenario on-device (each activity, posture,
+        and locomotion mode), rather than only on recorded data.
+  \item \textbf{Locomotion across vehicles.} Replace the single-vehicle PAMAP2 result with a
+        proper multi-vehicle evaluation (SHL) and reduce the remaining stationary-vs-vehicle
+        confusion.
+  \item \textbf{Posture \nb{device\_resting} branch.} The flat-pocket distinction (lying vs
+        a phone resting on a surface) is untested and currently flagged low-confidence.
+  \item \textbf{Transition windows.} 5\,s windows that straddle an activity change mix two
+        states; this is not yet characterized.
+  \item \textbf{Provisional thresholds.} Several thresholds were carried from the dataset
+        they were tuned on and need re-tuning on deployment (pocket) data.
+  \item \textbf{Activity ``vigorous'' class.} Currently unmodeled.
+\end{itemize}
+
+\vspace{1em}
+\noindent\rule{\linewidth}{0.4pt}\\[3pt]
+{\footnotesize \textbf{Source.} Every number and plot in this report is reproduced from the
+project notebooks (\nb{maths/}) and the live system (\nb{live/}); each state's notebook carries
+its full derivation, plots, and validation. Public repository:
+\url{https://github.com/BemnetMussa/Kinematics-axis}.}
+
+\end{document}

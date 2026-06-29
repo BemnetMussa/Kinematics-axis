@@ -65,4 +65,4 @@ def classify(w):
         feats += f" gyro={gyro_energy:.2f}rad/s"
     else:
         feats += " gyro=- (no gyro: cycling off)"
-    return {"label": label, "conf": conf, "note": feats}
+    return {"label": label, "conf": conf, "move": movement, "energy": energy, "gyro": gyro_energy, "note": feats}

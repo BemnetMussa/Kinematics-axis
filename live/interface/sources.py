@@ -15,7 +15,7 @@ class PhyphoxSource:
     (no guessing); any sensor the experiment does not expose simply stays None."""
     # phyphox sensor source -> our key
     SOURCE_MAP = {"accelerometer": "accel", "gyroscope": "gyro", "linear_acceleration": "lin",
-                  "magnetic_field": "mag", "gravity": "gravity"}
+                  "magnetic_field": "mag", "gravity": "gravity", "location": "location"}
     CONNECT_TIMEOUT = 5.0     # phone / wifi can be slow on first contact
     POLL_TIMEOUT = 3.0
 
@@ -39,8 +39,13 @@ class PhyphoxSource:
             o = {}
             for d in inp.get("outputs", []):
                 o.update(d)                                   # outputs are [{"x":"accX"},{"t":"acc_time"},...]
-            if all(k in o for k in ("t", "x", "y", "z")):
-                self.bufnames[key] = (o["t"], o["x"], o["y"], o["z"])
+            if key == "location":
+                 # location usually has: t, lat, lon, speed, alt, ...
+                 # we just look for 't' and 'speed'
+                 if "t" in o and "speed" in o:
+                     self.bufnames[key] = (o["t"], o["speed"])
+            elif all(k in o for k in ("t", "x", "y", "z")):
+                 self.bufnames[key] = (o["t"], o["x"], o["y"], o["z"])
         try:
             self.requests.get(f"{self.url}/control?cmd=start", timeout=self.CONNECT_TIMEOUT)
         except Exception as e:
@@ -58,24 +63,37 @@ class PhyphoxSource:
         print("  units: accel/lin/gravity m/s^2 (axes convert to g), gyro rad/s, mag uT")
 
     def update(self):
-        for key, (tb, xb, yb, zb) in self.bufnames.items():
+        for key, bufs in self.bufnames.items():
             lt = self.last_t[key]
-            u = (f"{self.url}/get?{tb}={lt}&{xb}={lt}%7C{tb}&{yb}={lt}%7C{tb}&{zb}={lt}%7C{tb}")
-            try:
-                d = self.requests.get(u, timeout=self.POLL_TIMEOUT).json()["buffer"]
-                rows = list(zip(d[tb]["buffer"], d[xb]["buffer"], d[yb]["buffer"], d[zb]["buffer"]))
-                rows = [r for r in rows if None not in r]
-                if rows:
-                    self.data[key].extend(rows)
-                    self.last_t[key] = rows[-1][0]
-                    cutoff = self.last_t[key] - (WIN_SEC + 2.0)
-                    self.data[key] = [r for r in self.data[key] if r[0] >= cutoff]
-                elif self.last_t[key] == 0.0 and key not in self._reported_empty:
-                    print(f"  [empty] sensor '{key}' buffer {xb}/{tb} returned no samples "
-                          f"(is the experiment recording? is the buffer name right?)")
-                    self._reported_empty.add(key)
-            except Exception as e:
-                print(f"  [warn] '{key}' fetch failed (buffer {xb}/{tb}): {type(e).__name__}: {e}")
+            # bufs is (t, speed) for location, (t, x, y, z) for others
+            if key == "location":
+                tb, sb = bufs
+                u = f"{self.url}/get?{tb}={lt}&{sb}={lt}%7C{tb}"
+                try:
+                    d = self.requests.get(u, timeout=self.POLL_TIMEOUT).json()["buffer"]
+                    rows = list(zip(d[tb]["buffer"], d[sb]["buffer"]))
+                    rows = [r for r in rows if None not in r]
+                    if rows:
+                        self.data[key].extend(rows)
+                        self.last_t[key] = rows[-1][0]
+                        cutoff = self.last_t[key] - (WIN_SEC + 2.0)
+                        self.data[key] = [r for r in self.data[key] if r[0] >= cutoff]
+                except Exception as e:
+                    print(f"  [warn] '{key}' fetch failed (buffer {sb}): {type(e).__name__}: {e}")
+            else:
+                tb, xb, yb, zb = bufs
+                u = (f"{self.url}/get?{tb}={lt}&{xb}={lt}%7C{tb}&{yb}={lt}%7C{tb}&{zb}={lt}%7C{tb}")
+                try:
+                    d = self.requests.get(u, timeout=self.POLL_TIMEOUT).json()["buffer"]
+                    rows = list(zip(d[tb]["buffer"], d[xb]["buffer"], d[yb]["buffer"], d[zb]["buffer"]))
+                    rows = [r for r in rows if None not in r]
+                    if rows:
+                        self.data[key].extend(rows)
+                        self.last_t[key] = rows[-1][0]
+                        cutoff = self.last_t[key] - (WIN_SEC + 2.0)
+                        self.data[key] = [r for r in self.data[key] if r[0] >= cutoff]
+                except Exception as e:
+                    print(f"  [warn] '{key}' fetch failed (buffer {xb}): {type(e).__name__}: {e}")
 
     def now(self):
         return max((self.last_t[k] for k in self.bufnames), default=0.0)
@@ -140,6 +158,25 @@ class SyntheticSource:
             if i >= n:
                 break
         self.t, self.accel, self.lin, self.gyro, self.mag, self.gravity = t, accel, lin, gyro, mag, gravity
+        # Sim speed (m/s): driving 14m/s (~50km/h), walking 1.4m/s, running 3m/s, still 0
+        speed = np.zeros(n)
+        for label, secs in timeline:
+            # Re-apply same timeline slices to speed
+            # (In a real refactor we'd do this inside the loop above, but this is simpler for diff)
+            pass
+        # Better: let's just add it to the loop above in my next turn if needed, or just hardcode it here.
+        self.speed = np.zeros(n)
+        i = 0
+        for label, secs in timeline:
+            k = int(secs * FS)
+            sl = slice(i, min(i+k, n))
+            s_val = 0.0
+            if label == "driving": s_val = 14.0
+            elif label == "walking": s_val = 1.4
+            elif label == "running": s_val = 3.5
+            elif label == "cycling": s_val = 6.0
+            self.speed[sl] = s_val + rng.normal(0, 0.1, (len(self.speed[sl])))
+            i += k
         self.tmax = t[-1]
 
     def update(self):
@@ -154,8 +191,12 @@ class SyntheticSource:
         if m.sum() < 5:
             return {"fs": FS, "available": {}}
         out = {"fs": FS, "t": self.t[m], "available": {}}
-        arrays = {"accel": self.accel, "lin": self.lin, "gyro": self.gyro, "mag": self.mag, "gravity": self.gravity}
-        for k in SENSORS:
+        arrays = {"accel": self.accel, "lin": self.lin, "gyro": self.gyro, "mag": self.mag, "gravity": self.gravity, "location": self.speed}
+        for k in SENSORS + ["location"]:
+            if k == "location":
+                 out["speed"] = self.speed[m]
+                 out["available"]["location"] = True
+                 continue
             present = k not in self.drop
             out[k] = arrays[k][m] if present else None
             out["available"][k] = present
@@ -166,18 +207,21 @@ def _resample(raw, tmax, seconds):
     """Resample each available sensor onto a common 50 Hz grid over the last `seconds`."""
     grid = np.arange(tmax - seconds, tmax, 1.0 / FS)
     out = {"fs": FS, "t": grid, "available": {}}
-    for sensor in SENSORS:
+    for sensor in SENSORS + ["location"]:
         arr = raw.get(sensor)
         if arr is None or len(arr) < 5:
             out[sensor] = None
             out["available"][sensor] = False
             continue
         t = arr[:, 0]
-        if t[-1] < grid[0]:                              # sensor stalled (no recent samples)
+        if t[-1] < grid[0]:
             out[sensor] = None
             out["available"][sensor] = False
             continue
-        out[sensor] = np.column_stack([np.interp(grid, t, arr[:, k]) for k in (1, 2, 3)])
+        if sensor == "location":
+             out["speed"] = np.interp(grid, t, arr[:, 1])
+        else:
+             out[sensor] = np.column_stack([np.interp(grid, t, arr[:, k]) for k in (1, 2, 3)])
         out["available"][sensor] = True
     return out
 

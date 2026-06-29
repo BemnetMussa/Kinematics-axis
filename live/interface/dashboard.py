@@ -6,7 +6,7 @@ only the axis calls now go through the per-axis classify() functions (same logic
 import time
 import numpy as np
 
-from core.config import G, SENSORS, ACT_SEC, WIN_SEC, CALIB_SEC, GET_READY_SEC
+from core.config import G, SENSORS, ACT_SEC, WIN_SEC, CALIB_SEC, GET_READY_SEC, MAG_DEV_T, INC_DEV_T
 from core.features import magnetic_features
 from interface.sources import get_sensor_window, PhyphoxSource
 from interface.web import _publish
@@ -60,11 +60,33 @@ def calibrate(source):
     return calib
 
 
+def _magnetometer_diag(w, calib):
+    if w.get("mag") is None or w.get("accel") is None:
+        return None
+    if calib.get("base_mag") is None or calib.get("base_inc") is None:
+        return None
+    mf = magnetic_features(w["mag"], w["accel"].mean(axis=0))
+    dmag = abs(mf["field_mag"] - calib["base_mag"])
+    dinc = abs(mf["inclination"] - calib["base_inc"])
+    vehicle = dmag > MAG_DEV_T or dinc > INC_DEV_T
+    return {
+        "field_mag": mf["field_mag"],
+        "field_var": mf["field_var"],
+        "inclination": mf["inclination"],
+        "base_mag": calib["base_mag"],
+        "base_inc": calib["base_inc"],
+        "dmag": dmag,
+        "dinc": dinc,
+        "vehicle": vehicle,
+    }
+
+
 def run_once(source, calib):
     w_act = get_sensor_window(ACT_SEC)
     w_long = get_sensor_window(WIN_SEC)
     avail = w_long.get("available", {})
-    flag = " ".join(f"{s}:{'ok' if avail.get(s) else '--'}" for s in SENSORS)
+    sensors_to_check = SENSORS + ["location"]
+    flag = " ".join(f"{s}:{'ok' if avail.get(s) else '--'}" for s in sensors_to_check)
     print(f"[t={source.now():5.1f}s]  sensors: {flag}")
 
     def safe(name, fn):
@@ -79,13 +101,32 @@ def run_once(source, calib):
     pos = safe("postural",   lambda: classify_postural(w_long, calib))
     loco = safe("locomotion", lambda: classify_locomotion(w_long, calib))
 
+    # Speed diagnostics
+    speed_raw = w_long.get("speed")
+    speed_ms = np.mean(speed_raw) if speed_raw is not None else 0.0
+    speed_kmh = speed_ms * 3.6
+
     av = act.get("label")
     print(f"  activity   : {str(av):12s}" + (f"(conf {act['conf']})" if av else "") + f" | {act['note']}")
+    if speed_raw is not None:
+        print(f"  gps/speed  : {speed_kmh:5.1f} km/h")
     rs = reg.get("score")
     print(f"  regularity : {(f'{rs:.2f}' if rs is not None else 'null'):12s}"
           + (f"(conf {reg['conf']})" if reg.get('conf') is not None else "") + f" | {reg['note']}")
     print(f"  postural   : {str(pos.get('label')):12s} | {pos['note']}")
     print(f"  locomotion : {str(loco.get('label')):12s} | {loco['note']}")
+
+    mag = _magnetometer_diag(w_long, calib)
+    if mag is None:
+        print("  magnetometer: (unavailable or not calibrated)")
+    else:
+        verdict = "vehicle" if mag["vehicle"] else "baseline"
+        print(
+            "  magnetometer: "
+            f"field={mag['field_mag']:.1f}uT base={mag['base_mag']:.1f} d={mag['dmag']:.1f} | "
+            f"inc={mag['inclination']:.0f}deg base={mag['base_inc']:.0f} d={mag['dinc']:.0f} | "
+            f"var={mag['field_var']:.1f} -> {verdict}"
+        )
 
     # overall needs the three categorical axes; null regularity is treated as "calm", not a blocker
     if all(x.get("label") is not None for x in (act, pos, loco)):
@@ -96,4 +137,4 @@ def run_once(source, calib):
         missing = [n for n, x in (("activity", act), ("postural", pos), ("locomotion", loco)) if x.get("label") is None]
         print(f"  overall    : (skipped: {', '.join(missing)} unavailable)")
     print()
-    _publish(source, act, reg, pos, loco, ov)        # mirror to the web view (presentation only)
+    _publish(source, act, reg, pos, loco, ov, mag)        # mirror to the web view (presentation only)
