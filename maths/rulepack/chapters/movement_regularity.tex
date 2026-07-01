@@ -193,9 +193,9 @@ Standing / sitting / lying          & No  & No  & No --- returns null \\
 \noindent\textbf{Scientific boundary.} Even with ideal data, the score cannot attribute
 \emph{cause}: it measures the presence of rhythm, not its origin, so it approximates
 ``movement smoothness'' rather than directly measuring any affective or neuromotor state.
-Rhythmic-versus-irregular separation on pocket placement is confirmed only for the
-still-versus-rhythmic contrast; irregular-but-moving on pocket is not yet validated on
-own-phone data.
+On PAMAP2 (chest) the score separates rhythmic from irregular-but-moving activity, so it is
+not merely a movement detector; on the pocket, only the still-versus-rhythmic contrast is
+confirmed so far, and rhythmic-versus-irregular-moving on the pocket is owed to own-phone data.
 
 \section{Worked Example: Steady Commute Walk}
 
@@ -245,13 +245,33 @@ too few cycles.
   regularity number is only surfaced while \texttt{ACT} indicates locomotion; on its own,
   regularity cannot tell moving-irregular from still, which is why the two axes are read
   together.
-  \item \textbf{Validation status.} Continuous Moe-Nilssen score built on PAMAP2 trunk data
-  (rank-separation ROC-AUC $\approx 0.95$; no labelled accuracy by design). Chest
-  $\rightarrow$ pocket placement transfer of the period selection and movement floor is
-  proven on held-out MotionSense (walking $0.71$, running $0.66$, both above sedentary
-  $\sim0.30$). Still owed to own-phone data: irregular-but-moving separation on pocket, and
-  cycling-cadence handling.
+  \item \textbf{Validation status.} No labelled accuracy by design (there is no ground-truth
+  regularity label), so validation is by \emph{separation}. On PAMAP2 chest, rhythmic vs
+  irregular ROC-AUC $0.99$ (per-subject median $0.99$, all 8 evaluable subjects $\geq 0.97$).
+  It transfers \emph{frozen} to two further datasets and sensor types (table below).
+  \textbf{And it is regularity, not movement:} restricted to \emph{moving} windows --- so
+  ``moving vs still'' cannot explain the split --- rhythmic vs irregular-but-moving
+  (vacuuming, ironing) still separates at ROC-AUC $0.99$: vacuuming moves yet scores
+  ${\sim}0.25$ while walking scores ${\sim}0.94$ (regularity correlates with movement only
+  ${\sim}{+}0.5$). This movement-control exists only on PAMAP2; the pocket version is owed to
+  own-phone data.
 \end{itemize}
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.4cm} >{\raggedright\arraybackslash}p{3.6cm} >{\raggedright\arraybackslash}p{3.4cm} l@{}}
+\toprule
+\textbf{Dataset} & \textbf{Placement / sensor} & \textbf{Contrast} & \textbf{ROC-AUC} \\
+\midrule
+PAMAP2      & chest, research IMU        & rhythmic vs irregular & $0.99$ \\
+MotionSense & pocket, phone              & rhythmic vs still     & $0.96$ \\
+HHAR        & waist/hand, phone + watch  & walking vs still      & $0.98$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent{\footnotesize MotionSense/HHAR have no irregular-but-moving activity, so
+cross-dataset confirms rhythmic $>$ still only. HHAR must be resampled \emph{within gap-free
+spans}: its heterogeneous sampling, interpolated across gaps, otherwise fakes periodicity.}
 
 % ---- Formula flow diagram ----
 \begin{figure}[h]
