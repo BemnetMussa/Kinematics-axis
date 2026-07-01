@@ -1,0 +1,293 @@
+\chapter{Movement Regularity}
+
+\noindent\textbf{Movement Regularity} estimates \textit{how rhythmic and self-repeating
+the body's motion is over a short window} --- a smoothness score, not an intensity or a
+posture. It is theoretically distinct from \textbf{Activity State} (which measures
+\textit{how much} motion and of \textit{what type}) and from \textbf{Postural State}
+(which measures orientation relative to gravity). A person can be highly active yet
+irregular (stumbling, fidgeting) or barely active yet perfectly regular (a slow steady
+walk); regularity is the axis that separates these, so it is a genuinely non-redundant
+construct rather than a re-scaling of activity intensity.
+
+\begin{callout}
+\textbf{Scope.} This score reports \textit{whether} motion repeats cleanly, not \textit{why}
+it does or does not. A low score cannot by itself distinguish a mechanical cause (rough
+terrain, an obstacle) from a physiological one (tremor, agitation, fatigue). The score is
+only defined while the body is actually moving rhythmically; when the person is still, or
+when too few motion cycles fall inside the window, the axis returns \textbf{null} rather
+than a misleadingly ``perfect'' value. Resolving the cause of irregularity requires the
+Activity State context and the downstream heart-rate / affective layer.
+\end{callout}
+
+\section{Theoretical Basis}
+
+The score is the normalized \emph{unbiased autocorrelation} of the acceleration-magnitude
+signal at its dominant period. This is the trunk-accelerometry gait-regularity index of
+\textbf{Moe-Nilssen \& Helbostad (2004)}: for a walking signal, the value of the normalized
+autocorrelation at the stride lag measures how closely one stride reproduces the next, and
+the authors note it is cheap enough for portable devices. The parts of the formula
+\emph{directly evidenced} by that work are the unbiased-autocorrelation estimator and the
+use of its dominant-period peak height as the regularity index. The remaining choices are
+\emph{engineering adaptations}, flagged as such below: the clamp to $[0,1]$, the movement
+and cycle-count gates, the pocket-placement lag band, and the two-factor confidence.
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{Acceleration magnitude $|a_\text{body}|$} --- gravity-removed body
+  acceleration reduced to its Euclidean norm, making the feature orientation-invariant
+  (the same rhythm reads identically regardless of how the phone is rotated in the pocket).
+  \item \textbf{Unbiased autocorrelation} --- the $1/(N-k)$ normalization corrects the
+  end-of-window sample deficit so that longer lags are not artificially damped
+  (Moe-Nilssen \& Helbostad, 2004).
+  \item \textbf{Smoothness alternatives (not used, cited for completeness)} --- spectral
+  arc length SPARC (Balasubramanian et al., 2012) and log dimensionless jerk (LDLJ) are
+  established smoothness measures; autocorrelation is chosen here because it is
+  period-aware and matches the gait literature.
+  \item \textbf{Affective relevance} --- reduced or irregular ambulatory movement is
+  associated with agitation and anxiety in actigraphy studies, which motivates exposing
+  regularity to the downstream affective read.
+\end{itemize}
+
+\section{Input Signals}
+
+\begin{center}
+\begin{tabular}{@{}l l >{\raggedright\arraybackslash}p{7.4cm}@{}}
+\toprule
+\textbf{Signal} & \textbf{Symbol} & \textbf{Description} \\
+\midrule
+Body acceleration      & $a_\text{body}$ & Gravity-removed 3-axis acceleration (m/s$^2$);
+                                            linear-accel sensor, or raw accel low-passed at 0.3\,Hz \\
+Acceleration magnitude & $s$             & $|a_\text{body}|/g$, orientation-invariant motion size (g) \\
+Dominant lag           & $k^\star$       & Period (samples) of the strongest self-repeat in the window \\
+Activity state         & \texttt{ACT}    & Context gate: regularity is only meaningful while walking/running \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Window $N = 250$ samples ($5$\,s at $F_s = 50$\,Hz), 50\% overlap. No personal
+baseline is required: the score is self-referential within the window.
+
+\section{Rule Formula}
+
+\begin{rulebox}{RULE-MR}{Movement Regularity Score}
+\textbf{Step 1 --- Magnitude and detrend:}
+\[ s(t) = \frac{|a_\text{body}(t)|}{g}, \qquad x(t) = s(t) - \overline{s}, \qquad
+   \text{movement} = \std(s). \]
+
+\textbf{Step 2 --- Unbiased, normalized autocorrelation} (lags $k = 0\dots K$, $K=100$):
+\[ r(k) = \frac{1}{N-k}\sum_{t=0}^{N-1-k} x(t)\,x(t+k), \qquad
+   \rho(k) = \frac{r(k)}{r(0)}. \]
+
+\textbf{Step 3 --- Dominant period} (argmax over the stride band, not the first peak):
+\[ k^\star = \operatorname*{arg\,max}_{k\in[10,100]} \rho(k), \qquad
+   n_\text{cyc} = \frac{N}{k^\star}. \]
+
+\textbf{Step 4 --- Score:}
+\[ R = \clamp\big(\rho(k^\star),\,0,\,1\big). \]
+
+\textbf{Step 5 --- Validity gate} (return \textbf{null} instead of a score if):
+\[ \text{movement} < 0.051\text{ g}\ \ (\text{low\_movement}) \quad\text{or}\quad
+   n_\text{cyc} < 3.5\ \ (\text{insufficient\_cycles}). \]
+
+\boxform{ R \in [0,1] \ \text{ if valid, else null} }
+
+\smallskip
+\textit{Example:} steady pocket walk, $\std(s)=0.37$\,g, $k^\star=55$ ($\approx0.9$\,Hz
+stride), $\rho(k^\star)=0.71$, $n_\text{cyc}=250/55=4.5$. Both gates pass
+$\Rightarrow R = 0.71$ (``rhythmic'').
+\end{rulebox}
+
+\section{Parameter Notes}
+
+\noindent\textbf{Lag band $[10,100]$ samples.}
+At $50$\,Hz this covers stride periods $0.2$--$2.0$\,s ($0.5$--$5$\,Hz), the plausible human
+cadence range. Taking the \emph{argmax} over the whole band (rather than the first
+prominence peak) is deliberate: on pocket data the autocorrelation has strong sub-stride
+harmonics, and the first peak grabs a half-stride and inverts the rank ordering. This is the
+FIX~2 correction re-derived during the chest$\rightarrow$pocket convergence test.
+
+\noindent\textbf{Movement floor $0.051$\,g.}
+Below this, magnitude variation is sensor noise, not motion, and the autocorrelation of
+noise produces a spurious high peak. The value is the chest-derived $0.5$\,m/s$^2$ floor
+re-expressed in g ($0.5/9.81$); expressing it in stream units was FIX~1 of the convergence
+test.
+
+\noindent\textbf{Minimum cycles $3.5$ strides.}
+Fewer than $\sim$3--4 repeats in the window makes a ``regularity'' estimate statistically
+meaningless. $3.5$ stride-periods is the gait-literature adequacy minimum, re-expressed for
+the argmax-selects-stride convention on pocket placement.
+
+\noindent\textbf{Fusion method.}
+There is \emph{no} multi-signal fusion in the score itself --- it is a single autocorrelation
+read. Fusion appears only in the \emph{confidence} (\S\,Confidence), which combines two
+\emph{independent} adequacy factors (enough cycles, and a prominent peak) as a geometric
+mean, so that either factor being weak pulls confidence down.
+
+\subsection*{Provenance --- where each number comes from}
+
+Tags: \textsc{theory} = taken directly from the published method; \textsc{conv} = a
+standard/physiological choice; \textsc{design} = an engineering construction.
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.7cm} >{\raggedright\arraybackslash}p{2.2cm} l >{\raggedright\arraybackslash}p{4.9cm} l@{}}
+\toprule
+\textbf{Constant} & \textbf{Value} & \textbf{Data} & \textbf{How it was set} & \textbf{Tag} \\
+\midrule
+Regularity estimator & unbiased autocorr.\ peak & --- & Moe-Nilssen \& Helbostad (2004) trunk-gait index & \textsc{theory} \\
+Lag band            & $[10,100]$  & --- & Stride periods $0.2$--$2.0$\,s at $50$\,Hz & \textsc{conv} \\
+Movement floor      & $0.051$\,g  & --- & Chest $0.5$\,m/s$^2$ noise floor re-expressed in g (unit fix) & \textsc{design} \\
+Min.\ cycles        & $3.5$ strides & --- & Gait-literature adequacy minimum ($\sim$3--4 strides) & \textsc{conv} \\
+Prominence sat.\ ($P_\text{full}$) & $1.5$ & --- & Point at which the confidence term saturates & \textsc{design} \\
+Confidence          & $\sqrt{c_\text{cyc}\,c_\text{prom}}$ & --- & Geometric mean of two adequacy factors & \textsc{design} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The estimator is the one number taken straight from published theory; the score's
+\emph{separation} was validated on PAMAP2/MotionSense (\S\,1.9), while the gates and
+confidence are design choices calibrated to keep noise from scoring as rhythm. The
+authoritative build lives in the \texttt{movement\_regularity.py} axis and the
+convergence-test notebook.
+
+\section{Confidence}
+
+\noindent\textbf{Step C1 --- Cycle adequacy} (how far past the minimum the window sits):
+\[ c_\text{cyc} = \clamp\!\left(\frac{n_\text{cyc}-3.5}{5.0-3.5},\,0,\,1\right). \]
+
+\noindent\textbf{Step C2 --- Peak prominence} ($p$ = prominence of the peak at $k^\star$;
+$1.5$ = saturation):
+\[ c_\text{prom} = \clamp\!\left(\frac{p}{1.5},\,0,\,1\right). \]
+
+\noindent\textbf{Step C3 --- Final confidence} (geometric mean of the two):
+\boxform{ \text{conf} = \sqrt{\,c_\text{cyc}\cdot c_\text{prom}\,} }
+
+\noindent\emph{Confidence ceiling / caveat.} This axis reports no labelled accuracy by
+design --- it is validated by \emph{separation} (rank-ordering rhythmic above irregular
+above still), not against a ground-truth ``regularity'' label, which does not exist in the
+datasets. Confidence therefore expresses \emph{internal signal quality} (enough clean
+cycles), not calibrated correctness, and should not be read as a probability.
+
+\section{Interpretation Scale}
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Score} & \textbf{Level} & \textbf{Meaning} \\
+\midrule
+0.0--0.2 & Erratic          & Motion present but not self-repeating (stumbling, fidgeting) \\
+0.2--0.4 & Low regularity   & Weak, inconsistent rhythm \\
+0.4--0.6 & Moderate         & Discernible but imperfect rhythm \\
+0.6--0.8 & Rhythmic         & Clear, steady periodic motion (typical walking) \\
+0.8--1.0 & Highly regular   & Metronomic, strongly self-repeating (steady running/pace) \\
+\midrule
+\textit{null} & Not applicable & Still, or too few cycles --- no rhythm to score \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Context Applicability}
+
+\begin{callout}
+\textbf{Target context:} on-body (pocket / trunk) accelerometry during \emph{sustained
+locomotion}. The score is most reliable when the Activity State is walking or running.
+\end{callout}
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.6cm} c c >{\raggedright\arraybackslash}p{3.6cm}@{}}
+\toprule
+\textbf{Context} & \textbf{$|a_\text{body}|$} & \textbf{cycles $\geq 3.5$} & \textbf{Reliable?} \\
+\midrule
+Walking / running (pocket or trunk) & Yes & Yes & Yes --- full \\
+Cycling / non-gait rhythmic motion  & Yes & Partial & Partial (period may fall outside band) \\
+Standing / sitting / lying          & No  & No  & No --- returns null \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Scientific boundary.} Even with ideal data, the score cannot attribute
+\emph{cause}: it measures the presence of rhythm, not its origin, so it approximates
+``movement smoothness'' rather than directly measuring any affective or neuromotor state.
+Rhythmic-versus-irregular separation on pocket placement is confirmed only for the
+still-versus-rhythmic contrast; irregular-but-moving on pocket is not yet validated on
+own-phone data.
+
+\section{Worked Example: Steady Commute Walk}
+
+\noindent\textit{Scenario.} A user walks to a bus stop at a relaxed, even pace, phone in the
+front trouser pocket. Over one $5$\,s window the pipeline extracts:
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Signal} & \textbf{Value} \\
+\midrule
+$\std(s)$ (movement)        & $0.37$\,g \\
+Dominant lag $k^\star$      & $55$ samples ($\approx 0.9$\,Hz stride) \\
+$\rho(k^\star)$             & $0.71$ \\
+Peak prominence $p$         & $0.60$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Step-by-step:}
+\begin{align*}
+n_\text{cyc} &= 250/55 = 4.5 \;(\geq 3.5,\ \text{movement } 0.37>0.051 \Rightarrow \text{valid})\\
+R            &= \clamp(0.71,0,1) = \mathbf{0.71}\\
+c_\text{cyc} &= \clamp\big((4.5-3.5)/1.5,0,1\big) = 0.67\\
+c_\text{prom}&= \clamp(0.60/1.5,0,1) = 0.40\\
+\text{conf}  &= \sqrt{0.67\cdot 0.40} = \mathbf{0.52}
+\end{align*}
+
+\begin{callout}
+\textbf{Interpretation:} $R = 0.71$ falls in the \emph{Rhythmic} band --- a clean, steady
+walking cadence. The dominant driver is the high autocorrelation peak ($\rho=0.71$);
+confidence is moderate ($0.52$), held down by the modest peak prominence rather than by
+too few cycles.
+\end{callout}
+
+\section{Implementation Notes}
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{Window.} $250$ samples ($5$\,s) at $50$\,Hz, 50\% overlap; magnitude is
+  read from the same rolling buffer the other 5\,s axes use.
+  \item \textbf{Fallback behavior.} No accel/linear stream $\rightarrow$ null. A window that
+  is $>50\%$ bad samples ($\mathrm{NaN}$ or $>16$\,g), or whose first sample is bad,
+  $\rightarrow$ null (\texttt{window\_unreliable}); shorter gaps are forward-filled. If
+  \texttt{scipy} is unavailable the score still computes; only the prominence confidence
+  factor degrades.
+  \item \textbf{Relationship to other chapters.} Gated by \textbf{Activity State} --- a
+  regularity number is only surfaced while \texttt{ACT} indicates locomotion; on its own,
+  regularity cannot tell moving-irregular from still, which is why the two axes are read
+  together.
+  \item \textbf{Validation status.} Continuous Moe-Nilssen score built on PAMAP2 trunk data
+  (rank-separation ROC-AUC $\approx 0.95$; no labelled accuracy by design). Chest
+  $\rightarrow$ pocket placement transfer of the period selection and movement floor is
+  proven on held-out MotionSense (walking $0.71$, running $0.66$, both above sedentary
+  $\sim0.30$). Still owed to own-phone data: irregular-but-moving separation on pocket, and
+  cycling-cadence handling.
+\end{itemize}
+
+% ---- Formula flow diagram ----
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  node distance=10mm and 14mm,
+  box/.style={draw, dashed, rounded corners=1pt, align=center, inner sep=5pt, font=\small},
+  op/.style={draw, rounded corners=1pt, align=center, inner sep=5pt, font=\small},
+  resultbox/.style={draw, double, rounded corners=3pt, align=center, inner sep=6pt, font=\small\bfseries},
+  gate/.style={draw, dashed, align=center, inner sep=4pt, font=\footnotesize},
+  ar/.style={-{Latex[length=2mm]}}]
+
+  \node[box] (in) {Body acceleration\\ $|a_\text{body}|/g$};
+  \node[op, below=of in] (ac) {Unbiased autocorrelation\\ $\rho(k)$ \; (Steps 1--2)};
+  \node[op, below=of ac] (peak) {Dominant period $k^\star$\\ $=\arg\max_{[10,100]}\rho$ \; (Step 3)};
+  \node[gate, right=10mm of peak] (g) {Gates:\\ movement $\geq 0.051$g\\ $n_\text{cyc}\geq 3.5$};
+  \node[resultbox, below=of peak] (score) {$R=\clamp(\rho(k^\star),0,1) \in [0,1]$};
+
+  \draw[ar] (in) -- (ac);
+  \draw[ar] (ac) -- (peak);
+  \draw[ar] (peak) -- (score);
+  \draw[ar] (g) -- (score) node[midway,above,font=\footnotesize] {else null};
+\end{tikzpicture}
+\caption*{\small Formula flow --- Movement Regularity: one orientation-invariant input,
+period-aware autocorrelation, a validity gate, and a $[0,1]$ score.}
+\end{figure}

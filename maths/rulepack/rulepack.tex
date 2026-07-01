@@ -1,0 +1,64 @@
+% Synheart Kinematic RulePack
+% Mathematical documentation of the deterministic kinematic-axis rules.
+% Build: pdflatex rulepack.tex  (run twice for headers/refs)
+\documentclass[11pt,twoside]{report}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage[most]{tcolorbox}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric,calc}
+\usepackage{fancyhdr}
+\usepackage[hidelinks]{hyperref}
+
+% ---- running headers / footers: "Synheart RulePack" like the template ----
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\chaptermark}[1]{\markboth{\MakeUppercase{Chapter \thechapter.\ #1}}{}}
+\renewcommand{\sectionmark}[1]{\markright{\thesection.\ #1}}
+\fancyhead[LE]{\small\leftmark}
+\fancyhead[RO]{\small\rightmark}
+\fancyfoot[C]{\small\itshape Synheart RulePack}
+\fancyfoot[LE,RO]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% ---- shared boxes matching the template's thin black-ruled callouts ----
+\newtcolorbox{callout}{
+  colback=white, colframe=black, sharp corners, boxrule=0.4pt,
+  left=8pt, right=8pt, top=6pt, bottom=6pt }
+
+% the big framed RULE box: \begin{rulebox}{RULE-XX}{Title} ... \end{rulebox}
+\newtcolorbox{rulebox}[2]{
+  colback=white, colframe=black, sharp corners, boxrule=0.8pt,
+  left=10pt, right=10pt, top=8pt, bottom=8pt,
+  before upper={\noindent\textbf{#1}\quad\textit{#2}\par\smallskip} }
+
+% boxed final result: \boxform{ STATE = ... }
+\newcommand{\boxform}[1]{\medskip\noindent\fbox{$\displaystyle #1$}\medskip}
+
+\newcommand{\clamp}{\operatorname{clamp}}
+\newcommand{\std}{\operatorname{std}}
+
+\title{\vspace{-2cm}\textbf{Synheart Kinematic RulePack}\\[0.4em]
+       \large Mathematical documentation of the deterministic kinematic axes}
+\author{Bemnet Mussa \,\textperiodcentered\, Synheart AI}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+
+% chapters (final ordering to be confirmed):
+\include{chapters/activity_state}
+\include{chapters/movement_regularity}
+% \include{chapters/postural_state}
+% \include{chapters/locomotion_state}
+% \include{chapters/overall_state}
+
+\end{document}

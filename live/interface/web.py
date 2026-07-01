@@ -72,11 +72,11 @@ def humanize(act, reg, pos, loco, ov):
             "secondary": _secondary(act, reg, pos, loco)}
 
 
-def _publish(source, act, reg, pos, loco, ov, mag):
+def _publish(source, act, reg, pos, loco, ov, mag=None, calibrating=False, countdown=0):
     """Snapshot the current readings for the web view. Called after the terminal print; changes nothing there."""
-    # Extract high-ROI numeric features for live graphing
-    # Note: these are proxies derived from the axis notes or calculated again if needed.
-    # For efficiency in the presentation layer, we just extract what we need.
+    
+    # Ready if we have a valid posture result and aren't in the middle of calibration
+    ready = not calibrating and pos.get("label") is not None
     
     metrics = {
         "move": float(act.get("move") or pos.get("move") or 0.0),
@@ -87,27 +87,18 @@ def _publish(source, act, reg, pos, loco, ov, mag):
         "speed": 0.0
     }
     
-    # Check for speed in source/window if we want to be explicit, 
-    # but here we can just check if source.get_window returned it indirectly.
-    # Actually, dashboard.py already calculated speed_kmh. 
-    # To keep it simple, I'll let dashboard pass it or I'll extract it from source here.
     from interface.sources import get_sensor_window
-    w = get_sensor_window(1.0) # short window for live speed
+    w = get_sensor_window(1.0)
     if w.get("speed") is not None:
         metrics["speed"] = float(np.mean(w["speed"])) * 3.6
 
     _set_latest({
-        "ready": True,
+        "ready": ready,
+        "calibrating": calibrating,
+        "countdown": countdown,
         "t": round(source.now(), 1),
-        "readings": {
-            "activity":   {"label": act.get("label"), "conf": act.get("conf")},
-            "regularity": {"score": reg.get("score"), "reason": reg.get("reason")},
-            "postural":   {"label": pos.get("label")},
-            "locomotion": {"label": loco.get("label")},
-            "overall":    ({"situation": ov["situation"], "exertion": ov["exertion"]} if ov else None),
-        },
         "metrics": metrics,
-        "human": humanize(act, reg, pos, loco, ov),
+        "human": humanize(act, reg, pos, loco, ov) if ready else None,
     })
 
 
@@ -334,8 +325,9 @@ HTML_PAGE = """<!doctype html>
       
       if(!s.ready){ 
         iEl.textContent='🛰️'; 
-        sEl.textContent='Calibrating...';
+        sEl.textContent = s.calibrating ? `Calibrating: ${s.countdown}s` : 'Calibrating...';
         sEl.parentElement.classList.add('dim');
+        cEl.textContent = 'STAND STILL — CAPTURING POSTURE';
         return; 
       }
       

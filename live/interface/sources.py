@@ -192,7 +192,7 @@ class SyntheticSource:
             return {"fs": FS, "available": {}}
         out = {"fs": FS, "t": self.t[m], "available": {}}
         arrays = {"accel": self.accel, "lin": self.lin, "gyro": self.gyro, "mag": self.mag, "gravity": self.gravity, "location": self.speed}
-        for k in SENSORS + ["location"]:
+        for k in (*SENSORS, "location"):
             if k == "location":
                  out["speed"] = self.speed[m]
                  out["available"]["location"] = True
@@ -207,7 +207,7 @@ def _resample(raw, tmax, seconds):
     """Resample each available sensor onto a common 50 Hz grid over the last `seconds`."""
     grid = np.arange(tmax - seconds, tmax, 1.0 / FS)
     out = {"fs": FS, "t": grid, "available": {}}
-    for sensor in SENSORS + ["location"]:
+    for sensor in (*SENSORS, "location"):
         arr = raw.get(sensor)
         if arr is None or len(arr) < 5:
             out[sensor] = None
@@ -219,9 +219,9 @@ def _resample(raw, tmax, seconds):
             out["available"][sensor] = False
             continue
         if sensor == "location":
-             out["speed"] = np.interp(grid, t, arr[:, 1])
+            out["speed"] = np.interp(grid, t, arr[:, 1])
         else:
-             out[sensor] = np.column_stack([np.interp(grid, t, arr[:, k]) for k in (1, 2, 3)])
+            out[sensor] = np.column_stack([np.interp(grid, t, arr[:, k]) for k in (1, 2, 3)])
         out["available"][sensor] = True
     return out
 

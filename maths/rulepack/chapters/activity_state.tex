@@ -1,0 +1,309 @@
+\chapter{Activity State}
+
+\noindent\textbf{Activity State} estimates \textit{the type and intensity of whole-body
+movement} --- sedentary, walking, running, or cycling --- from the strength and frequency
+of acceleration. It is theoretically distinct from \textbf{Postural State} (which measures
+body orientation, not whether or how the body is moving) and from \textbf{Movement
+Regularity} (which measures how rhythmic a motion is, not what kind it is or how energetic).
+This is the foundational axis: it labels \emph{what the body is doing}, and the other axes
+either build on that label or resolve the questions it deliberately leaves open.
+
+\begin{callout}
+\textbf{Scope.} This axis reports the dominant activity \emph{class} over a short window,
+not a continuous intensity. Standing folds into \emph{sedentary} on purpose --- posture is a
+separate question, delegated to Postural State --- and ``vigorous'' is not modelled as a
+class above running. The confound most likely to occur is \textbf{walking versus running}:
+their energy distributions genuinely overlap, and the split in that overlap rests on cadence
+and on placement-specific thresholds. Cycling can only be detected when a gyroscope is
+present; without one it reads as sedentary (pedalling is low in linear acceleration).
+\end{callout}
+
+\section{Theoretical Basis}
+
+The rule is an \emph{accelerometer intensity cut-point} classifier, the decades-old method
+of the physical-activity-monitoring literature, extended with a cadence tie-breaker and a
+rotational cue for cycling. The core feature --- the standard deviation of the acceleration
+magnitude --- is the same construct as \textbf{MAD} (Mean Amplitude Deviation,
+V\"ah\"a-Yp\"y\"a et al., 2015) and \textbf{ENMO} (Euclidean Norm Minus One, Hildebrand et
+al., 2014, the GGIR default), and the cut-point idea traces to activity-count thresholds
+(Freedson et al., 1998; Troiano et al., 2008). What is \emph{directly evidenced} by that
+work is the use of a magnitude-intensity statistic against fixed thresholds. The
+\emph{engineering adaptations}, flagged below, are the specific threshold values (re-derived
+on MotionSense), the cadence tie-breaker inside the overlap band, and the gyroscope cycling
+branch.
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{Acceleration magnitude intensity} --- $\std(|a_\text{body}|)$ separates
+  still from moving and low- from high-energy gait; it is orientation-invariant, so it does
+  not depend on how the device is carried (Yurtman \& Barshan, 2017).
+  \item \textbf{Cadence (step frequency)} --- where energy alone cannot separate a fast walk
+  from a slow run, step rate can; walking and running occupy different cadence ranges in the
+  gait literature.
+  \item \textbf{Rotational energy for cycling} --- pedalling produces little linear
+  acceleration but strong limb/segment rotation, so mean gyroscope magnitude detects cycling
+  that the accelerometer misses.
+\end{itemize}
+
+\section{Input Signals}
+
+\begin{center}
+\begin{tabular}{@{}l l >{\raggedright\arraybackslash}p{7.2cm}@{}}
+\toprule
+\textbf{Signal} & \textbf{Symbol} & \textbf{Description} \\
+\midrule
+Body acceleration     & $a_\text{body}$ & Gravity-removed 3-axis acceleration (m/s$^2$) \\
+Motion size           & \texttt{move}   & $\std(|a_\text{body}|/g)$ over the window (g) \\
+Energy                & \texttt{energy} & $\overline{|a_\text{body}|/g}$, mean magnitude (g) \\
+Cadence               & \texttt{cad}    & Step frequency (Hz) from the autocorrelation peak \\
+Gyroscope energy      & \texttt{gyro}   & $\overline{|\omega|}$, mean angular-rate magnitude (rad/s); cycling cue \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Window $128$ samples ($2.56$\,s at $F_s = 50$\,Hz), 50\% overlap --- the shortest
+of the axes, so activity reacts quickly. No personal baseline: the thresholds are
+population-derived and frozen.
+
+\section{Rule Formula}
+
+\begin{rulebox}{RULE-AS}{Activity State Classifier}
+\textbf{Step 1 --- Features} ($s = |a_\text{body}|/g$; cadence over lag band $[10,64]$):
+\[ \texttt{move}=\std(s),\quad \texttt{energy}=\overline{s},\quad
+   \texttt{cad}=\frac{F_s}{k^\star},\quad \texttt{gyro}=\overline{|\omega|}. \]
+
+\textbf{Step 2 --- Still gate:}
+\[ \texttt{move} < 0.10\text{ g} \ \Rightarrow\ \textbf{sedentary}. \]
+
+\textbf{Step 3 --- Walk / run split} (else, i.e.\ moving):
+\[
+\begin{aligned}
+0.77 \leq \texttt{energy} \leq 1.07:\quad
+   &\textbf{running if } \texttt{cad}\geq 1.20\text{ Hz, else } \textbf{walking}\\
+\text{otherwise}:\quad
+   &\textbf{running if } \texttt{energy}\geq 1.00\text{ g, else } \textbf{walking}
+\end{aligned}
+\]
+
+\textbf{Step 4 --- Cycling override} (only in the still region, needs gyro):
+\[ \big(\texttt{move} < 0.10 \ \wedge\ \texttt{gyro} > 0.18\text{ rad/s}\big)\ \Rightarrow\ \textbf{cycling}. \]
+
+\boxform{ \texttt{label} \in \{\text{sedentary},\ \text{walking},\ \text{running},\ \text{cycling}\} }
+
+\smallskip
+\textit{Example} (real window, \S\,1.8): $\texttt{move}=0.54$, $\texttt{energy}=0.91$ (in
+the overlap band $\Rightarrow$ energy cannot decide), $\texttt{cad}=1.43\geq1.20\Rightarrow$
+\textbf{running}.
+\end{rulebox}
+
+\section{Parameter Notes}
+
+\noindent\textbf{Still threshold $T_\text{STILL}=0.10$\,g.}
+Below this, magnitude variation is sensor noise, not body motion. Re-derived on MotionSense;
+the UCI-HAR value ($0.05$) did \emph{not} transfer because of the unit/placement difference,
+which is why every threshold here is stated in g on the same body-acceleration scale.
+
+\noindent\textbf{Run energy line $T_\text{RUN}=1.00$\,g and overlap band $[0.77,\,1.07]$.}
+Outside the band, mean magnitude alone separates walking from running. Inside the band the
+two classes' energy distributions touch (train-supported edges), so energy is \emph{not}
+trusted there --- the cadence tie-breaker takes over.
+
+\noindent\textbf{Cadence split $CAD_\text{RUN}=1.20$\,Hz \;(\textsc{provisional}).}
+Used \emph{only} inside the overlap band. It is placement-specific: on waist data
+(HHAR) the autocorrelation fundamental flips between step and stride, so this value does not
+transfer unchanged and is flagged provisional pending own-phone pocket data.
+
+\noindent\textbf{Gyro cycling threshold $T_\text{GYRO}=0.18$\,rad/s \;(\textsc{provisional}).}
+Derived on HHAR (waist); pocket cycling is not yet verified. The branch fires only in the
+still region so it cannot corrupt walking/running.
+
+\noindent\textbf{Fusion method.}
+This is a \emph{priority decision cascade}, not a weighted sum. Energy decides first;
+cadence is a \emph{tie-breaker} used only where energy is ambiguous; the gyroscope is an
+\emph{override gate} confined to the still region. The ordering encodes which cue is trusted
+in which regime, keeping each class's decision traceable to one deciding quantity.
+
+\subsection*{Provenance --- where each number comes from}
+
+Every constant is traceable to a dataset or a stated convention; none is a free guess. The
+labels mean: \textsc{data} = computed from the data by a formula; \textsc{fitted} = read off
+the observed feature distributions and then validated on held-out subjects; \textsc{conv} = a
+standard/physiological choice, not tuned; \textsc{prov} = data-informed but not locked
+(placement-specific); \textsc{design} = an engineering construction.
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.7cm} >{\raggedright\arraybackslash}p{2.2cm} l >{\raggedright\arraybackslash}p{4.9cm} l@{}}
+\toprule
+\textbf{Constant} & \textbf{Value} & \textbf{Data} & \textbf{How it was set} & \textbf{Tag} \\
+\midrule
+Window / overlap   & $128/64$        & ---         & UCI-HAR standard $2.56$\,s window, 50\% overlap & \textsc{conv} \\
+Cadence lag band   & $[10,64]$       & ---         & Human cadence $0.78$--$5$\,Hz at $50$\,Hz       & \textsc{conv} \\
+$T_\text{STILL}$   & $0.10$\,g       & MotionSense & Read off the still/moving split in the feature plot; held-out validated & \textsc{fitted} \\
+$T_\text{RUN}$     & $1.00$\,g       & MotionSense & Read off the walk/run energy separation; held-out validated & \textsc{fitted} \\
+Overlap band       & $[0.77,1.07]$\,g & MotionSense & Empirical edges of the walk/run energy overlap & \textsc{data} \\
+$CAD_\text{RUN}$   & $1.20$\,Hz      & MotionSense & Walk/run cadence split; did not transfer to waist & \textsc{prov} \\
+$T_\text{GYRO}$    & $0.18$\,rad/s   & HHAR        & Gap midpoint $(\text{sed}_{p95}+\text{cyc}_{p05})/2$ & \textsc{prov} \\
+Confidence proxy   & $0.5+0.5\,\clamp(m)$ & ---    & Threshold-distance construction (live)          & \textsc{design} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The \textsc{fitted} thresholds ($T_\text{STILL}$, $T_\text{RUN}$) are round numbers
+chosen by reading the MotionSense training distributions, not the output of an optimizer;
+their justification is the held-out accuracy (\S\,1.9), not a closed-form derivation. The
+authoritative derivation lives in the \texttt{activity\_state.ipynb} notebook.
+
+\section{Confidence}
+
+Confidence is a deterministic \emph{margin proxy} in $[0.5,1.0]$: how far the deciding
+quantity sits from the threshold that chose the label.
+
+\noindent\textbf{Step C1 --- Deciding margin $m$} (by the branch that fired):
+\[
+m =
+\begin{cases}
+(\texttt{gyro}-0.18)/0.18 & \text{cycling}\\[2pt]
+(0.10-\texttt{move})/0.10 & \text{sedentary}\\[2pt]
+|\texttt{cad}-1.20|/1.20  & \text{walk/run inside the band}\\[2pt]
+(\texttt{energy}-1.00)/1.00 & \text{running (outside band)}\\[2pt]
+(1.00-\texttt{energy})/1.00 & \text{walking (outside band)}
+\end{cases}
+\]
+
+\noindent\textbf{Step C2 --- Confidence:}
+\boxform{ \text{conf} = 0.5 + 0.5\,\clamp(m,\,0,\,1) }
+
+\noindent\emph{Confidence ceiling / caveat.} This is a \emph{proxy}, not the trained,
+calibrated confidence. On the source bench (MotionSense) the calibrated model reaches
+$\mathrm{ECE}=0.024$; the proxy reads $0.5$ at a decision boundary (maximum uncertainty) and
+$1.0$ far from it. Off-source it is less calibrated, so it should be read as a relative
+distance-to-boundary, not a probability.
+
+\section{Interpretation Scale}
+
+Activity State is categorical; the ``scale'' is the class set and each class's signature.
+
+\begin{center}
+\begin{tabular}{@{}l >{\raggedright\arraybackslash}p{4.6cm} >{\raggedright\arraybackslash}p{5.2cm}@{}}
+\toprule
+\textbf{Class} & \textbf{Signature} & \textbf{Meaning} \\
+\midrule
+Sedentary & $\texttt{move}<0.10$\,g & Still or near-still: sitting, standing, resting (posture delegated) \\
+Walking   & Moving, below the run line / in-band cadence $<1.20$\,Hz & Steady low-to-moderate gait \\
+Running   & $\texttt{energy}\geq 1.00$\,g, or in-band cadence $\geq 1.20$\,Hz & High-energy, fast-cadence gait \\
+Cycling   & Still-region body motion with $\texttt{gyro}>0.18$\,rad/s & Low linear motion but rotational (pedalling); needs a gyroscope \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Context Applicability}
+
+\begin{callout}
+\textbf{Target context:} a phone or wearable carried on the body (pocket-scale placement),
+sampling accelerometer and gyroscope at $50$\,Hz.
+\end{callout}
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{5.4cm} c c >{\raggedright\arraybackslash}p{3.8cm}@{}}
+\toprule
+\textbf{Context} & \textbf{accel} & \textbf{gyro} & \textbf{Reliable?} \\
+\midrule
+Phone in pocket (target)      & Yes & Yes     & Yes --- all four classes \\
+Waist / no gyroscope          & Yes & No      & Partial --- cycling reads as sedentary \\
+Wrist / other placement       & Yes & Partial & Partial --- cadence/gyro thresholds shift \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Scientific boundary.} Even with ideal data the axis cannot separate
+\emph{standing} from \emph{sitting} or from sedentary --- that needs orientation, delegated
+to Postural State. It does not model ``vigorous'' as a class above running. The
+walking/running boundary is a real energy overlap resolved heuristically by cadence, and both
+the cadence and gyro thresholds are placement-specific rather than universal.
+
+\section{Worked Example: Resolving a Jog in the Overlap Band}
+
+\noindent\textit{Scenario (real captured window).} A user jogs at a steady pace, phone in the
+front pocket. The window below is a genuine capture, not an invented one --- MotionSense
+subject~19 (held out from all threshold derivation), jog trial, $58.9$\,s in
+(\texttt{jog\_9/sub\_19.csv}, samples $2944$--$3071$) --- run through the live axis. Its
+energy lands inside the walk/run overlap band, so energy alone cannot decide the class.
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Signal} & \textbf{Value} \\
+\midrule
+\texttt{move} (std of $s$)   & $0.54$\,g \\
+\texttt{energy} (mean of $s$)& $0.91$\,g \;(in band $[0.77,1.07]$) \\
+\texttt{cad}                 & $1.43$\,Hz \\
+\texttt{gyro}                & $1.87$\,rad/s \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent\textbf{Step-by-step:}
+\begin{align*}
+\texttt{move}=0.54 &\geq 0.10 \Rightarrow \text{not sedentary}\\
+\texttt{energy}=0.91 &\in[0.77,1.07] \Rightarrow \text{use cadence, not energy}\\
+\texttt{cad}=1.43 &\geq 1.20 \Rightarrow \textbf{running}\\
+\texttt{move} &< 0.10 \text{ false} \Rightarrow \text{cycling override does not fire}\\
+m = |1.43-1.20|/1.20 = 0.19,\quad
+\text{conf} &= 0.5 + 0.5\cdot 0.19 = \mathbf{0.60}
+\end{align*}
+
+\begin{callout}
+\textbf{Interpretation:} the window is classified \emph{running}. Because the energy fell in
+the overlap band, the decisive driver was the \emph{cadence} ($1.43$\,Hz), not the energy.
+Confidence is moderate ($0.60$): the step rate is above but not far above the $1.20$\,Hz
+walk/run line, which is exactly the region where this axis is least certain. The gyroscope
+reads high ($1.87$\,rad/s) but is ignored --- the cycling override only fires in the still
+region, and here the body is clearly moving.
+\end{callout}
+
+\section{Implementation Notes}
+
+\begin{itemize}[leftmargin=1.4em]
+  \item \textbf{Window.} $128$ samples ($2.56$\,s) at $50$\,Hz, 50\% overlap --- the shortest
+  window in the pack, so the activity label updates fastest.
+  \item \textbf{Fallback behavior.} No accel/linear stream $\rightarrow$ null. No gyroscope
+  $\rightarrow$ the cycling branch is disabled and the reading note says so; the accel classes
+  are unaffected. Cadence still computes from the accelerometer.
+  \item \textbf{Relationship to other chapters.} The standing/sitting ambiguity it folds into
+  sedentary is resolved by \textbf{Postural State}; its walking/running output gates
+  \textbf{Movement Regularity} (only meaningful while moving) and feeds \textbf{Locomotion}
+  and the \textbf{Overall State} combiner.
+  \item \textbf{Validation status.} MotionSense (subject-independent): $97.1\%$ accuracy,
+  macro-F1 $0.948$, $\mathrm{ECE}=0.024$ with the cadence tie-breaker; the only real
+  confusion is walk$\leftrightarrow$run at the energy overlap. HHAR frozen cross-dataset:
+  shared classes (sedentary, walking) macro-F1 $0.996$. Cycling via the gyro branch: F1
+  $0.92$ in isolation, $0.829$ integrated. $CAD_\text{RUN}$ and $T_\text{GYRO}$ remain
+  provisional pending own-phone pocket data.
+\end{itemize}
+
+% ---- Formula flow diagram ----
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  node distance=10mm and 26mm,
+  box/.style={draw, dashed, rounded corners=1pt, align=center, inner sep=5pt, font=\small},
+  op/.style={draw, rounded corners=1pt, align=center, inner sep=5pt, font=\small},
+  resultbox/.style={draw, double, rounded corners=3pt, align=center, inner sep=6pt, font=\small\bfseries},
+  ar/.style={-{Latex[length=2mm]}}]
+
+  \node[box] (a) {Accel magnitude\\ $s=|a_\text{body}|/g$};
+  \node[op, below=of a] (feat) {Features:\\ \texttt{move}, \texttt{energy}, \texttt{cad}};
+  \node[op, below=of feat] (casc) {Decision cascade\\ (Steps 2--3)};
+  \node[resultbox, below=of casc] (out) {\texttt{label} $\in$ \{sedentary, walking,\\ running, cycling\}};
+
+  \node[box, right=of a] (g) {Gyroscope\\ $|\omega|$};
+  \node[op, below=of g] (cyc) {Cycling override\\ still $\wedge\ \texttt{gyro}>0.18$\\ (Step 4)};
+
+  \draw[ar] (a) -- (feat);
+  \draw[ar] (feat) -- (casc);
+  \draw[ar] (casc) -- (out);
+  \draw[ar] (g) -- (cyc);
+  \draw[ar] (cyc) |- (casc) node[pos=0.28,above,font=\footnotesize] {override};
+\end{tikzpicture}
+\caption*{\small Formula flow --- Activity State: a priority decision cascade over
+orientation-invariant accelerometer features, with a gyroscope override for cycling.}
+\end{figure}

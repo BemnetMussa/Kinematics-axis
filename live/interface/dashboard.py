@@ -35,7 +35,13 @@ def calibrate(source):
     while source.now() - t0 < ready + CALIB_SEC:
         source.update()
         if live:
-            left = ready + CALIB_SEC - (source.now() - t0)
+            elapsed = source.now() - t0
+            left = ready + CALIB_SEC - elapsed
+            
+            # Publish to web so the UI updates during calibration
+            _publish(source, {}, {}, {}, {}, None, None, 
+                     calibrating=True, countdown=int(np.ceil(max(0, left))))
+            
             if left > CALIB_SEC:                          # still in the get-into-position phase
                 sec = int(np.ceil(left - CALIB_SEC))
                 if sec not in announced:
@@ -85,7 +91,7 @@ def run_once(source, calib):
     w_act = get_sensor_window(ACT_SEC)
     w_long = get_sensor_window(WIN_SEC)
     avail = w_long.get("available", {})
-    sensors_to_check = SENSORS + ["location"]
+    sensors_to_check = (*SENSORS, "location")
     flag = " ".join(f"{s}:{'ok' if avail.get(s) else '--'}" for s in sensors_to_check)
     print(f"[t={source.now():5.1f}s]  sensors: {flag}")
 
