@@ -1,0 +1,71 @@
+\chapter*{Key Terms \& Notation}
+\addcontentsline{toc}{chapter}{Key Terms \& Notation}
+\markboth{KEY TERMS \& NOTATION}{}
+
+This front-matter defines the vocabulary shared across every axis chapter, so the chapters
+themselves stay focused on their own rule. Terms are grouped: signal concepts, then the
+provenance tags used in the Parameter Notes, then the mathematical notation.
+
+\section*{Signal concepts}
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{3.6cm} >{\raggedright\arraybackslash}p{10.8cm}@{}}
+\toprule
+\textbf{Term} & \textbf{Meaning} \\
+\midrule
+Window / step & The short slice of signal analysed at once (e.g.\ $2.56$ or $5$\,s). The step is how far the window advances each time; ``50\% overlap'' means it advances by half a window, so a new reading appears twice per window length. \\
+Sampling rate $F_s$ & Samples captured per second. Everything here is resampled to $50$\,Hz. \\
+Magnitude $|a|$ & The length of the 3-axis vector, $\sqrt{x^2+y^2+z^2}$. Collapsing the axes into one number makes it \emph{orientation-invariant}. \\
+Orientation-invariant & A feature whose value does not change when the device is rotated --- so it behaves the same in any pocket or wrist orientation. \\
+Body (gravity-removed) acceleration & Acceleration with the constant $1$\,g pull of gravity subtracted, leaving only real motion. Taken from a linear-acceleration sensor, or by low-pass-filtering the raw accelerometer. \\
+Movement vs energy & \texttt{movement} $=$ the standard deviation of the magnitude (how much it \emph{varies}); \texttt{energy} $=$ the mean magnitude (how much acceleration \emph{on average}). \\
+Cadence & Step/stride frequency in Hz, read from the autocorrelation. \\
+Autocorrelation / dominant period & How strongly a signal repeats itself at a given time-lag; the dominant period is the lag of the strongest repeat (the stride, for gait). \\
+Threshold / gate / cut-point & A fixed value the rule compares against to make a yes/no decision. \\
+Confidence proxy & A number in $[0.5,1]$ giving distance from the decision boundary: $0.5$ = right on the boundary (most uncertain), $1$ = far from it. It is \emph{not} a calibrated probability. \\
+Tilt & The angle of the device relative to gravity (used by Postural State). \\
+De-rotation & Rotating raw sensor readings into an earth-fixed frame before comparing them (used by Locomotion State). \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{Provenance tags}
+
+Each constant in a Parameter Notes section carries one of these tags, marking honestly where
+the number comes from.
+
+\begin{center}
+\begin{tabular}{@{}l >{\raggedright\arraybackslash}p{11.4cm}@{}}
+\toprule
+\textbf{Tag} & \textbf{Meaning} \\
+\midrule
+\textsc{theory}  & Taken directly from a published method. \\
+\textsc{data}    & Computed from the data by a formula. \\
+\textsc{fitted}  & Read off the observed feature distributions, then validated on held-out subjects --- a human choice informed by the data, not an optimizer's output. \\
+\textsc{conv}    & A standard or physiological choice, not tuned. \\
+\textsc{prov}    & Provisional: data-informed but not locked (e.g.\ placement-specific). Validate before trusting. \\
+\textsc{design}  & An engineering construction (e.g.\ the confidence formula). \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{Notation}
+
+\begin{center}
+\begin{tabular}{@{}l >{\raggedright\arraybackslash}p{10.8cm}@{}}
+\toprule
+\textbf{Symbol} & \textbf{Meaning} \\
+\midrule
+$F_s$ & Sampling rate ($50$\,Hz). \\
+$N$ & Window length in samples ($128$ for Activity, $250$ for the $5$\,s axes). \\
+$a_\text{body}$ & Body (gravity-removed) acceleration vector (m/s$^2$). \\
+$s = |a_\text{body}|/g$ & Acceleration magnitude in units of g. \\
+$k,\ k^\star$ & Autocorrelation lag (samples); $k^\star$ = the dominant-period lag. \\
+$\rho(k)$ & Normalized autocorrelation at lag $k$ (in $[-1,1]$). \\
+$n_\text{cyc}$ & Number of motion cycles in the window, $N/k^\star$. \\
+$T_{\bullet}$ & A named threshold (e.g.\ $T_\text{STILL}$, $T_\text{RUN}$, $T_\text{GYRO}$). \\
+$\clamp(x,0,1)$ & Clip $x$ to the range $[0,1]$. \\
+$\text{conf}$ & Confidence, in $[0.5,1]$. \\
+\bottomrule
+\end{tabular}
+\end{center}

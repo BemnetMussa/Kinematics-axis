@@ -11,11 +11,13 @@ either build on that label or resolve the questions it deliberately leaves open.
 \begin{callout}
 \textbf{Scope.} This axis reports the dominant activity \emph{class} over a short window,
 not a continuous intensity. Standing folds into \emph{sedentary} on purpose --- posture is a
-separate question, delegated to Postural State --- and ``vigorous'' is not modelled as a
-class above running. The confound most likely to occur is \textbf{walking versus running}:
-their energy distributions genuinely overlap, and the split in that overlap rests on cadence
-and on placement-specific thresholds. Cycling can only be detected when a gyroscope is
-present; without one it reads as sedentary (pedalling is low in linear acceleration).
+separate question, delegated to Postural State. Cycling, by contrast, is kept as its own
+class because the body is working hard while producing little linear acceleration: without a
+dedicated (gyroscope) cue it would read as sedentary, and its raised heart rate would then be
+misattributed to stress rather than exercise. The confound most likely to occur is
+\textbf{walking versus running}: their energy distributions genuinely overlap, and the split
+in that overlap rests on cadence and on placement-specific thresholds. Cycling can only be
+detected when a gyroscope is present; without one it reads as sedentary.
 \end{callout}
 
 \section{Theoretical Basis}
@@ -97,24 +99,29 @@ the overlap band $\Rightarrow$ energy cannot decide), $\texttt{cad}=1.43\geq1.20
 
 \section{Parameter Notes}
 
-\noindent\textbf{Still threshold $T_\text{STILL}=0.10$\,g.}
-Below this, magnitude variation is sensor noise, not body motion. Re-derived on MotionSense;
-the UCI-HAR value ($0.05$) did \emph{not} transfer because of the unit/placement difference,
-which is why every threshold here is stated in g on the same body-acceleration scale.
+\noindent\textbf{Still threshold $T_\text{STILL}=0.10$\,g} {\footnotesize\textsc{[fitted, MotionSense]}}\textbf{.}
+Below this, magnitude variation is sensor noise, not body motion. The UCI-HAR value
+($0.05$) did \emph{not} transfer because of the unit/placement difference, which is why every
+threshold here is stated in g on the same body-acceleration scale.
 
-\noindent\textbf{Run energy line $T_\text{RUN}=1.00$\,g and overlap band $[0.77,\,1.07]$.}
+\noindent\textbf{Run energy line $T_\text{RUN}=1.00$\,g and overlap band $[0.77,\,1.07]$}
+{\footnotesize\textsc{[fitted / data, MotionSense]}}\textbf{.}
 Outside the band, mean magnitude alone separates walking from running. Inside the band the
-two classes' energy distributions touch (train-supported edges), so energy is \emph{not}
-trusted there --- the cadence tie-breaker takes over.
+two classes' energy distributions touch, so energy is \emph{not} trusted there --- the
+cadence tie-breaker takes over.
 
-\noindent\textbf{Cadence split $CAD_\text{RUN}=1.20$\,Hz \;(\textsc{provisional}).}
-Used \emph{only} inside the overlap band. It is placement-specific: on waist data
-(HHAR) the autocorrelation fundamental flips between step and stride, so this value does not
-transfer unchanged and is flagged provisional pending own-phone pocket data.
+\noindent\textbf{Cadence split $CAD_\text{RUN}=1.20$\,Hz} {\footnotesize\textsc{[provisional, MotionSense]}}\textbf{.}
+Used \emph{only} inside the overlap band. It is placement-specific: on waist data (HHAR) the
+autocorrelation fundamental flips between step and stride, so this value does not transfer
+unchanged. In practice cadence is a \emph{narrow refinement, not a pillar}: it fires only in
+the overlap band, lifted held-out accuracy by about $1.8$ points ($95.3\to97.1\%$), and is
+the most fragile part of the rule --- an item to re-derive on own-phone pocket data.
 
-\noindent\textbf{Gyro cycling threshold $T_\text{GYRO}=0.18$\,rad/s \;(\textsc{provisional}).}
+\noindent\textbf{Gyro cycling threshold $T_\text{GYRO}=0.18$\,rad/s} {\footnotesize\textsc{[provisional, HHAR]}}\textbf{.}
 Derived on HHAR (waist); pocket cycling is not yet verified. The branch fires only in the
-still region so it cannot corrupt walking/running.
+still region so it cannot corrupt walking/running --- but on held-out data this threshold both
+\emph{misses} hard pedalling and \emph{false-fires} on phone-handling while standing
+(quantified in \S\,1.5), so it is an open validation item.
 
 \noindent\textbf{Fusion method.}
 This is a \emph{priority decision cascade}, not a weighted sum. Energy decides first;
@@ -122,35 +129,10 @@ cadence is a \emph{tie-breaker} used only where energy is ambiguous; the gyrosco
 \emph{override gate} confined to the still region. The ordering encodes which cue is trusted
 in which regime, keeping each class's decision traceable to one deciding quantity.
 
-\subsection*{Provenance --- where each number comes from}
-
-Every constant is traceable to a dataset or a stated convention; none is a free guess. The
-labels mean: \textsc{data} = computed from the data by a formula; \textsc{fitted} = read off
-the observed feature distributions and then validated on held-out subjects; \textsc{conv} = a
-standard/physiological choice, not tuned; \textsc{prov} = data-informed but not locked
-(placement-specific); \textsc{design} = an engineering construction.
-
-\begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.7cm} >{\raggedright\arraybackslash}p{2.2cm} l >{\raggedright\arraybackslash}p{4.9cm} l@{}}
-\toprule
-\textbf{Constant} & \textbf{Value} & \textbf{Data} & \textbf{How it was set} & \textbf{Tag} \\
-\midrule
-Window / overlap   & $128/64$        & ---         & UCI-HAR standard $2.56$\,s window, 50\% overlap & \textsc{conv} \\
-Cadence lag band   & $[10,64]$       & ---         & Human cadence $0.78$--$5$\,Hz at $50$\,Hz       & \textsc{conv} \\
-$T_\text{STILL}$   & $0.10$\,g       & MotionSense & Read off the still/moving split in the feature plot; held-out validated & \textsc{fitted} \\
-$T_\text{RUN}$     & $1.00$\,g       & MotionSense & Read off the walk/run energy separation; held-out validated & \textsc{fitted} \\
-Overlap band       & $[0.77,1.07]$\,g & MotionSense & Empirical edges of the walk/run energy overlap & \textsc{data} \\
-$CAD_\text{RUN}$   & $1.20$\,Hz      & MotionSense & Walk/run cadence split; did not transfer to waist & \textsc{prov} \\
-$T_\text{GYRO}$    & $0.18$\,rad/s   & HHAR        & Gap midpoint $(\text{sed}_{p95}+\text{cyc}_{p05})/2$ & \textsc{prov} \\
-Confidence proxy   & $0.5+0.5\,\clamp(m)$ & ---    & Threshold-distance construction (live)          & \textsc{design} \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\noindent The \textsc{fitted} thresholds ($T_\text{STILL}$, $T_\text{RUN}$) are round numbers
-chosen by reading the MotionSense training distributions, not the output of an optimizer;
-their justification is the held-out accuracy (\S\,1.9), not a closed-form derivation. The
-authoritative derivation lives in the \texttt{activity\_state.ipynb} notebook.
+\noindent\emph{Tags} (\textsc{fitted}, \textsc{data}, \textsc{prov}, \textsc{conv},
+\textsc{design}) classify where each number comes from; their meanings are defined in the Key
+Terms front-matter. Window ($128/64$) and cadence lag band ($[10,64]$) are \textsc{conv}
+(standard/physiological choices); the confidence formula below is \textsc{design}.
 
 \section{Confidence}
 
@@ -177,6 +159,16 @@ calibrated confidence. On the source bench (MotionSense) the calibrated model re
 $\mathrm{ECE}=0.024$; the proxy reads $0.5$ at a decision boundary (maximum uncertainty) and
 $1.0$ far from it. Off-source it is less calibrated, so it should be read as a relative
 distance-to-boundary, not a probability.
+
+\medskip
+\noindent\emph{Measured per class} (median confidence, held-out data): sedentary $0.97$,
+running $0.73$, walking $0.66$, cycling $1.00$ when it fires. Walking is structurally the
+least confident --- it is squeezed between the still line below and the run line above, so it
+always sits near a boundary. Cycling is confident \emph{when} the gyro cue trips, but that
+confidence measures distance-past-threshold, not correctness: on held-out data the branch
+\emph{missed} ${\sim}31\%$ of real cycling (hard pedalling crosses the still gate and reads as
+walking) and \emph{false-fired} on ${\sim}16\%$ of standing (phone handling pushes gyro past
+the provisional $T_\text{GYRO}$). Both are open items to validate on own-phone pocket data.
 
 \section{Interpretation Scale}
 
@@ -216,9 +208,11 @@ Wrist / other placement       & Yes & Partial & Partial --- cadence/gyro thresho
 
 \noindent\textbf{Scientific boundary.} Even with ideal data the axis cannot separate
 \emph{standing} from \emph{sitting} or from sedentary --- that needs orientation, delegated
-to Postural State. It does not model ``vigorous'' as a class above running. The
-walking/running boundary is a real energy overlap resolved heuristically by cadence, and both
-the cadence and gyro thresholds are placement-specific rather than universal.
+to Postural State. The walking/running boundary is a real energy overlap resolved
+heuristically by cadence, and both the cadence and gyro thresholds are placement-specific
+rather than universal. Cycling additionally requires a placement that is rotationally active
+but linearly quiet during pedalling: the torso qualifies (chest), the limbs do not
+(wrist/ankle keep moving and read as walking), so cycling detection is torso-placement-specific.
 
 \section{Worked Example: Resolving a Jog in the Overlap Band}
 
@@ -264,7 +258,11 @@ region, and here the body is clearly moving.
 
 \begin{itemize}[leftmargin=1.4em]
   \item \textbf{Window.} $128$ samples ($2.56$\,s) at $50$\,Hz, 50\% overlap --- the shortest
-  window in the pack, so the activity label updates fastest.
+  window in the pack, so the activity label updates fastest. There is an inherent latency: a
+  $2.56$\,s window means an activity change is only caught within about $1.3$--$2.6$\,s (a new
+  reading every ${\sim}1.3$\,s). This matches the physiology it contextualises (heart rate and
+  affect shift over tens of seconds) but is \emph{not} intended for instantaneous gesture or
+  fall detection.
   \item \textbf{Fallback behavior.} No accel/linear stream $\rightarrow$ null. No gyroscope
   $\rightarrow$ the cycling branch is disabled and the reading note says so; the accel classes
   are unaffected. Cadence still computes from the accelerometer.
@@ -272,13 +270,31 @@ region, and here the body is clearly moving.
   sedentary is resolved by \textbf{Postural State}; its walking/running output gates
   \textbf{Movement Regularity} (only meaningful while moving) and feeds \textbf{Locomotion}
   and the \textbf{Overall State} combiner.
-  \item \textbf{Validation status.} MotionSense (subject-independent): $97.1\%$ accuracy,
-  macro-F1 $0.948$, $\mathrm{ECE}=0.024$ with the cadence tie-breaker; the only real
-  confusion is walk$\leftrightarrow$run at the energy overlap. HHAR frozen cross-dataset:
-  shared classes (sedentary, walking) macro-F1 $0.996$. Cycling via the gyro branch: F1
-  $0.92$ in isolation, $0.829$ integrated. $CAD_\text{RUN}$ and $T_\text{GYRO}$ remain
-  provisional pending own-phone pocket data.
+  \item \textbf{Validation status.} Headline \textbf{97.1\%} on MotionSense (phone in pocket,
+  held-out subjects; macro-F1 $0.948$, well-calibrated $\mathrm{ECE}=0.024$). The rule then
+  holds \emph{frozen} (nothing re-derived) across two further datasets and sensor types
+  (table below) --- notably the walk/run boundary, which HHAR cannot test (it has no running),
+  is cross-validated on PAMAP2. Cycling is the one placement-dependent part.
+  $CAD_\text{RUN}$ and $T_\text{GYRO}$ stay provisional; pocket cycling and a phone-in-pocket
+  walk/run set (e.g.\ WISDM) are the remaining checks.
 \end{itemize}
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.3cm} >{\raggedright\arraybackslash}p{3.5cm} >{\raggedright\arraybackslash}p{2.5cm} >{\raggedright\arraybackslash}p{4.1cm}@{}}
+\toprule
+\textbf{Dataset} & \textbf{Sensor / placement} & \textbf{Classes} & \textbf{Result (frozen)} \\
+\midrule
+MotionSense & phone, pocket & sed / walk / run & $97.1\%$ held-out (macro-F1 $0.948$) \\
+HHAR & phones + watches, waist/hand & sed / walk (no running) & macro-F1 $0.996$ shared \\
+PAMAP2 & research IMUs, wrist/chest/ankle & walk / run & $0.89$--$0.96$ acc., all 3 placements \\
+PAMAP2 & \quad'' \;(cycling) & cycling & chest recall $0.67$; wrist/ankle ${\sim}0.03$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent{\footnotesize PAMAP2 figures use offline per-segment gravity removal; the live
+on-device per-window approximation lowers only ankle-walking ($0.72$ vs $0.93$) --- running
+and the torso/wrist placements are unaffected.}
 
 % ---- Formula flow diagram ----
 \begin{figure}[h]

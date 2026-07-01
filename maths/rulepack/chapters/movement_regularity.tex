@@ -98,55 +98,42 @@ $\Rightarrow R = 0.71$ (``rhythmic'').
 
 \section{Parameter Notes}
 
-\noindent\textbf{Lag band $[10,100]$ samples.}
+\noindent\textbf{Regularity estimator} {\footnotesize\textsc{[theory]}}\textbf{.}
+The score itself --- the normalized unbiased autocorrelation at the dominant period --- is
+taken directly from the Moe-Nilssen \& Helbostad (2004) trunk-gait index. It is the one number
+here that comes straight from published theory; everything else is a gate or a confidence
+around it.
+
+\noindent\textbf{Lag band $[10,100]$ samples} {\footnotesize\textsc{[conv]}}\textbf{.}
 At $50$\,Hz this covers stride periods $0.2$--$2.0$\,s ($0.5$--$5$\,Hz), the plausible human
 cadence range. Taking the \emph{argmax} over the whole band (rather than the first
 prominence peak) is deliberate: on pocket data the autocorrelation has strong sub-stride
 harmonics, and the first peak grabs a half-stride and inverts the rank ordering. This is the
 FIX~2 correction re-derived during the chest$\rightarrow$pocket convergence test.
 
-\noindent\textbf{Movement floor $0.051$\,g.}
+\noindent\textbf{Movement floor $0.051$\,g} {\footnotesize\textsc{[design]}}\textbf{.}
 Below this, magnitude variation is sensor noise, not motion, and the autocorrelation of
 noise produces a spurious high peak. The value is the chest-derived $0.5$\,m/s$^2$ floor
 re-expressed in g ($0.5/9.81$); expressing it in stream units was FIX~1 of the convergence
 test.
 
-\noindent\textbf{Minimum cycles $3.5$ strides.}
+\noindent\textbf{Minimum cycles $3.5$ strides} {\footnotesize\textsc{[conv]}}\textbf{.}
 Fewer than $\sim$3--4 repeats in the window makes a ``regularity'' estimate statistically
 meaningless. $3.5$ stride-periods is the gait-literature adequacy minimum, re-expressed for
 the argmax-selects-stride convention on pocket placement.
+
+\noindent\textbf{Prominence saturation $P_\text{full}=1.5$} {\footnotesize\textsc{[design]}}\textbf{.}
+The peak prominence at which the confidence prominence term reaches $1$; a chosen saturation
+point, not a measured quantity.
 
 \noindent\textbf{Fusion method.}
 There is \emph{no} multi-signal fusion in the score itself --- it is a single autocorrelation
 read. Fusion appears only in the \emph{confidence} (\S\,Confidence), which combines two
 \emph{independent} adequacy factors (enough cycles, and a prominent peak) as a geometric
-mean, so that either factor being weak pulls confidence down.
-
-\subsection*{Provenance --- where each number comes from}
-
-Tags: \textsc{theory} = taken directly from the published method; \textsc{conv} = a
-standard/physiological choice; \textsc{design} = an engineering construction.
-
-\begin{center}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.7cm} >{\raggedright\arraybackslash}p{2.2cm} l >{\raggedright\arraybackslash}p{4.9cm} l@{}}
-\toprule
-\textbf{Constant} & \textbf{Value} & \textbf{Data} & \textbf{How it was set} & \textbf{Tag} \\
-\midrule
-Regularity estimator & unbiased autocorr.\ peak & --- & Moe-Nilssen \& Helbostad (2004) trunk-gait index & \textsc{theory} \\
-Lag band            & $[10,100]$  & --- & Stride periods $0.2$--$2.0$\,s at $50$\,Hz & \textsc{conv} \\
-Movement floor      & $0.051$\,g  & --- & Chest $0.5$\,m/s$^2$ noise floor re-expressed in g (unit fix) & \textsc{design} \\
-Min.\ cycles        & $3.5$ strides & --- & Gait-literature adequacy minimum ($\sim$3--4 strides) & \textsc{conv} \\
-Prominence sat.\ ($P_\text{full}$) & $1.5$ & --- & Point at which the confidence term saturates & \textsc{design} \\
-Confidence          & $\sqrt{c_\text{cyc}\,c_\text{prom}}$ & --- & Geometric mean of two adequacy factors & \textsc{design} \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\noindent The estimator is the one number taken straight from published theory; the score's
-\emph{separation} was validated on PAMAP2/MotionSense (\S\,1.9), while the gates and
-confidence are design choices calibrated to keep noise from scoring as rhythm. The
-authoritative build lives in the \texttt{movement\_regularity.py} axis and the
-convergence-test notebook.
+mean, so that either factor being weak pulls confidence down. The score's \emph{separation}
+(not an absolute accuracy) was validated on PAMAP2/MotionSense; the gates and confidence are
+\textsc{design} choices tuned to keep noise from scoring as rhythm. Tag meanings are defined
+in the Key Terms front-matter.
 
 \section{Confidence}
 
